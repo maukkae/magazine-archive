@@ -2,7 +2,7 @@ manifestVersion: 1
 id: maukka-magazine-archive
 name: Magazine Archive
 tagline: Browse and search a self-hosted magazine collection
-icon: ./icon.svg
+icon: https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/1.png
 category: media
 version: "0.1.0"
 port: 8098
@@ -20,9 +20,12 @@ submission: https://github.com/maukkae/magazine-archive
 repo: https://github.com/maukkae/magazine-archive
 support: https://github.com/maukkae/magazine-archive/issues
 gallery:
-  - ./1.png
-  - ./2.png
-  - ./3.png
+  - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/1.png
+  - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/2.png
+  - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/3.png
+  - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/4.png
+  - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/5.png
+  - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/6.png
 releaseNotes: >-
   Initial packaging draft. Viewer, search API, and static-site container layout
   have been prepared for a future Umbrel community app release.
