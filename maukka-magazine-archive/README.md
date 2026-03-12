@@ -36,8 +36,12 @@ Container images expected by this draft:
 - `ghcr.io/maukkae/magazine-archive-viewer:latest`
 - `ghcr.io/maukkae/magazine-archive-search:latest`
 
-Those images do not exist yet. The next packaging step is to build and publish
-them so Umbrel can install the app without local `build:` contexts.
+Those images are meant to be published automatically from GitHub Actions via:
+
+- `.github/workflows/publish-ghcr-images.yml`
+
+After the first workflow run, make the GHCR packages public so Umbrel can pull
+them anonymously.
 
 This package is not yet the final production Umbrel app. It is a staging point
 for converting the current working local/Umbrel deployment into a clean
