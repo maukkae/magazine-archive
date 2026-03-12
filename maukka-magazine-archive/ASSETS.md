@@ -14,6 +14,14 @@ Suggested screenshots:
 3. Search page with fast results
 4. Mobile view (optional)
 
+Bundled demo data:
+
+- one seeded issue for app testing: `Pelit 1992/01`
+- JPG pages + thumbnails
+- minimal `manifest.json`
+- minimal `search_index.json`
+- matching `search.db`
+
 Recommended icon concept:
 
 - stylized open magazine spread

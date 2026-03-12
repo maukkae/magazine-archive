@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d1a">
+    <meta name="apple-mobile-web-app-title" content="Pelit">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/app.webmanifest">
+    <title>Magazines</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #fff;
+        }
+
+        #topBar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            padding-top: max(10px, env(safe-area-inset-top));
+            background: #16213e;
+            border-bottom: 1px solid #0f3460;
+            flex-shrink: 0;
+            gap: 10px;
+        }
+
+        #searchBtn {
+            font-size: 20px;
+            text-decoration: none;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        #siteTitle {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e94560;
+            letter-spacing: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        #selects {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .select-wrap { position: relative; }
+
+        .select-wrap::after {
+            content: '▾';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #e94560;
+            pointer-events: none;
+            font-size: 13px;
+        }
+
+        select {
+            padding: 8px 28px 8px 10px;
+            font-size: 15px;
+            background: #1a1a2e;
+            color: #fff;
+            border: 2px solid #0f3460;
+            border-radius: 8px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            min-width: 80px;
+        }
+
+        #yearSelect { width: 88px; }
+
+        #grid {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 12px;
+            align-content: start;
+        }
+
+        .cover-item {
+            text-decoration: none;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            background: #111827;
+            display: block;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .cover-item:active { border-color: #e94560; }
+
+        .cover-item img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .cover-label {
+            text-align: center;
+            font-size: 12px;
+            color: #555;
+            padding: 4px 0 6px;
+        }
+
+        .year-heading {
+            grid-column: 1 / -1;
+            font-size: 16px;
+            font-weight: bold;
+            color: #e94560;
+            letter-spacing: 1px;
+            padding: 16px 4px 6px;
+            border-bottom: 1px solid rgba(233, 69, 96, 0.25);
+        }
+        .year-heading:first-child { padding-top: 4px; }
+
+        #message {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #444;
+            font-size: 16px;
+        }
+
+        #backBtn {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 22px;
+            cursor: pointer;
+            flex-shrink: 0;
+            padding: 0;
+            line-height: 1;
+        }
+        #backBtn:active { color: #ccc; }
+
+        #magLanding {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 14px;
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 14px;
+            align-content: start;
+        }
+        #magLanding.active { display: grid; }
+
+        .mag-card {
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            background: #111827;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .mag-card:active { border-color: #e94560; }
+        .mag-card img {
+            display: block;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 3/4;
+            pointer-events: none;
+        }
+        .mag-label {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #ccc;
+            padding: 6px 4px 8px;
+        }
+
+        .lang-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.4);
+            border-radius: 5px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .lang-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+    </style>
+</head>
+<body>
+    <div id="topBar">
+        <button id="backBtn" style="display:none">&#8592;</button>
+        <span id="siteTitle">PELIT</span>
+        <a href="search.html" id="searchBtn" title="Search">&#128269;</a>
+        <button class="lang-toggle" id="langBtn"></button>
+        <div id="selects">
+            <div class="select-wrap">
+                <select id="magSelect"></select>
+            </div>
+            <div class="select-wrap">
+                <select id="yearSelect"></select>
+            </div>
+        </div>
+    </div>
+    <div id="message"></div>
+    <div id="grid" style="display:none"></div>
+    <div id="magLanding"></div>
+
+    <script src="lang.js"></script>
+    <script>
+        const t = Lang.t.bind(Lang);
+        const MAGAZINES = ['Hifimaailma', 'PC-Pelit', 'Pelit', 'Pelit_Vuosikirja', 'TM'];
+
+        const magSelect  = document.getElementById('magSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const grid       = document.getElementById('grid');
+        const message    = document.getElementById('message');
+        const siteTitle  = document.getElementById('siteTitle');
+        const magLanding = document.getElementById('magLanding');
+        const backBtn    = document.getElementById('backBtn');
+        const selects    = document.getElementById('selects');
+
+        const allCoversData = {};   // { mag: { year: [{iss, file}, ...] } }
+        let currentMag  = null;
+        let currentYear = null;
+        let available   = [];
+
+        function setGridHash(anchorId) {
+            history.replaceState(null, '', anchorId ? `#${anchorId}` : '#');
+        }
+
+        async function loadAllData() {
+            const manifest = await fetch('/manifest.json').then(r => r.json());
+            for (const [mag, magData] of Object.entries(manifest)) {
+                allCoversData[mag] = {};
+                for (const [year, issues] of Object.entries(magData)) {
+                    allCoversData[mag][year] = Object.keys(issues)
+                        .sort()
+                        .map(iss => ({ iss, file: `${mag}_${year}_${iss}_cover.jpg` }));
+                }
+            }
+        }
+
+        function appendCoverItem(iss, file, year) {
+            const a = document.createElement('a');
+            a.href      = `mobile_viewer.html?mag=${encodeURIComponent(currentMag)}&year=${year}&issue=${iss}`;
+            a.className = 'cover-item';
+            if (currentYear === 'all') {
+                const anchorId = `year-${year}`;
+                a.addEventListener('click', () => {
+                    sessionStorage.setItem(`mobileGridAnchor_${currentMag}`, anchorId);
+                    setGridHash(anchorId);
+                });
+            }
+
+            const img = document.createElement('img');
+            img.src       = `/jpg/${currentMag}/${year}/${file}`;
+            img.loading   = 'lazy';
+            img.alt       = `Issue ${parseInt(iss, 10)}`;
+            img.draggable = false;
+
+            const label = document.createElement('div');
+            label.className   = 'cover-label';
+            label.textContent = `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${year}`;
+
+            a.appendChild(img);
+            a.appendChild(label);
+            grid.appendChild(a);
+        }
+
+        function renderGrid() {
+            grid.innerHTML = '';
+            if (currentYear === 'all') {
+                const years = Object.keys(allCoversData[currentMag] || {})
+                    .map(Number).sort((a, b) => a - b);
+                years.forEach(year => {
+                    const h = document.createElement('div');
+                    h.className   = 'year-heading';
+                    h.id          = `year-${year}`;
+                    h.textContent = year;
+                    grid.appendChild(h);
+                    (allCoversData[currentMag][year] || []).forEach(({ iss, file }) =>
+                        appendCoverItem(iss, file, year));
+                });
+                const hashAnchor = /^#year-\d+$/.test(location.hash) ? location.hash.slice(1) : null;
+                const savedAnchor = sessionStorage.getItem(`mobileGridAnchor_${currentMag}`);
+                const anchorId = hashAnchor || savedAnchor;
+                if (anchorId) {
+                    requestAnimationFrame(() => {
+                        const el = document.getElementById(anchorId);
+                        if (el) el.scrollIntoView({ block: 'start' });
+                    });
+                    setGridHash(anchorId);
+                } else {
+                    setGridHash('grid');
+                }
+            } else {
+                (allCoversData[currentMag][currentYear] || []).forEach(({ iss, file }) =>
+                    appendCoverItem(iss, file, currentYear));
+                setGridHash('grid');
+            }
+        }
+
+        function populateYearSelect(mag) {
+            const years = Object.keys(allCoversData[mag] || {}).map(Number).sort((a, b) => a - b);
+            const savedVal = yearSelect.value;
+            yearSelect.innerHTML = '';
+            const allOpt       = document.createElement('option');
+            allOpt.value       = 'all';
+            allOpt.textContent = t('all_years');
+            yearSelect.appendChild(allOpt);
+            years.forEach(year => {
+                const opt       = document.createElement('option');
+                opt.value       = year;
+                opt.textContent = year;
+                yearSelect.appendChild(opt);
+            });
+            if (savedVal) yearSelect.value = savedVal;
+            return years;
+        }
+
+        function showMagLanding() {
+            sessionStorage.removeItem('mobileMag');
+            magLanding.innerHTML = '';
+            available.forEach(mag => {
+                const years = Object.keys(allCoversData[mag] || {}).map(Number).sort((a, b) => a - b);
+                if (!years.length) return;
+                const latestYear = years[years.length - 1];
+                const issues = allCoversData[mag][String(latestYear)] || [];
+                if (!issues.length) return;
+                const { iss, file } = issues[issues.length - 1];
+
+                const card = document.createElement('a');
+                card.className = 'mag-card';
+                card.href = `?mag=${encodeURIComponent(mag)}`;
+                const img = document.createElement('img');
+                img.src       = `/jpg/${mag}/${latestYear}/${file}`;
+                img.loading   = 'lazy';
+                img.alt       = mag.replace(/_/g, ' ');
+                img.draggable = false;
+                const label = document.createElement('div');
+                label.className   = 'mag-label';
+                label.textContent = mag.replace(/_/g, ' ');
+                card.appendChild(img);
+                card.appendChild(label);
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    sessionStorage.setItem('mobileMag', mag);
+                    magSelect.value = mag;
+                    switchToMag(mag);
+                });
+                magLanding.appendChild(card);
+            });
+            magLanding.classList.add('active');
+            grid.style.display    = 'none';
+            message.style.display = 'none';
+            selects.style.display = 'none';
+            backBtn.style.display = 'none';
+            siteTitle.textContent = t('landing_title');
+            setGridHash(null);
+        }
+
+        function switchToMag(mag) {
+            currentMag = mag;
+            siteTitle.textContent = mag.replace(/_/g, ' ').toUpperCase();
+            const years = populateYearSelect(mag);
+            if (!years.length) { message.textContent = t('no_covers'); return; }
+            const saved = sessionStorage.getItem(`mobileYear_${mag}`);
+            if (saved === 'all') {
+                currentYear = 'all';
+            } else {
+                const savedYear = parseInt(saved);
+                currentYear = (savedYear && years.includes(savedYear)) ? savedYear : years[years.length - 1];
+            }
+            yearSelect.value         = currentYear;
+            magLanding.classList.remove('active');
+            message.style.display    = 'none';
+            grid.style.display       = '';
+            selects.style.display    = '';
+            backBtn.style.display    = '';
+            renderGrid();
+        }
+
+        backBtn.addEventListener('click', showMagLanding);
+
+        magSelect.addEventListener('change', () => {
+            const mag = magSelect.value;
+            sessionStorage.setItem('mobileMag', mag);
+            switchToMag(mag);
+        });
+
+        yearSelect.addEventListener('change', () => {
+            const val = yearSelect.value;
+            sessionStorage.setItem(`mobileYear_${currentMag}`, val);
+            if (val !== 'all') sessionStorage.removeItem(`mobileGridAnchor_${currentMag}`);
+            currentYear = val === 'all' ? 'all' : parseInt(val);
+            renderGrid();
+        });
+
+        (async () => {
+            message.textContent = t('loading_covers');
+            await loadAllData();
+
+            available = MAGAZINES.filter(mag =>
+                Object.keys(allCoversData[mag] || {}).length > 0
+            );
+            if (!available.length) { message.textContent = t('no_covers'); return; }
+
+            available.forEach(mag => {
+                const opt       = document.createElement('option');
+                opt.value       = mag;
+                opt.textContent = mag.replace(/_/g, ' ');
+                magSelect.appendChild(opt);
+            });
+
+            const urlMag   = new URLSearchParams(location.search).get('mag');
+            const savedMag = sessionStorage.getItem('mobileMag');
+            currentMag = (urlMag   && available.includes(urlMag))   ? urlMag
+                       : (savedMag && available.includes(savedMag)) ? savedMag
+                       : null;
+            if (currentMag) {
+                magSelect.value = currentMag;
+                switchToMag(currentMag);
+            } else {
+                showMagLanding();
+            }
+            applyLang();
+        })();
+
+        function applyLang() {
+            const lang  = Lang.getLang();
+            const other = lang === 'en' ? 'EN' : 'FI';
+            const langBtn = document.getElementById('langBtn');
+            if (langBtn) { langBtn.textContent = other; langBtn.title = other; }
+            const searchBtn = document.getElementById('searchBtn');
+            if (searchBtn) searchBtn.title = t('search_btn_title');
+            backBtn.title = t('back');
+            // Update site title if on landing
+            if (magLanding.classList.contains('active')) {
+                siteTitle.textContent = t('landing_title');
+            }
+            // Re-populate year select to update translated strings
+            if (currentMag) {
+                populateYearSelect(currentMag);
+                if (currentYear !== undefined) yearSelect.value = currentYear;
+            }
+        }
+
+        document.getElementById('langBtn').addEventListener('click', () => {
+            Lang.setLang(Lang.getLang() === 'en' ? 'fi' : 'en');
+            applyLang();
+        });
+    </script>
+</body>
+</html>

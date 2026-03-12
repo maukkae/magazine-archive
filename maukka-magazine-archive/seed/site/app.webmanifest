@@ -1,0 +1,9 @@
+{
+  "name": "Pelit Viewer",
+  "short_name": "Pelit",
+  "start_url": "/mobile.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a"
+}

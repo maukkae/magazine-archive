@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d1a">
+    <meta name="apple-mobile-web-app-title" content="Pelit">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/app.webmanifest">
+    <title>Magazines</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d0d1a;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            height: 100dvh;
+            width: 100vw;
+            touch-action: none;
+        }
+
+        /* 3-slot strip — each slot holds up to 2 page images */
+        #strip {
+            display: flex;
+            width: 300vw;
+            height: 100vh;
+            height: 100dvh;
+            transform: translateX(-100vw);
+            will-change: transform;
+        }
+
+        .slot {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Natural (unzoomed) image sizing.
+           In landscape 2-page mode JS sets max-width to calc(50vw - 2px) inline.
+           In portrait JS leaves max-width at 100vw (the CSS default below). */
+        .pg {
+            display: block;
+            max-width: 100vw;
+            max-height: 100vh;
+            max-height: 100dvh;
+            width: auto;
+            height: auto;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
+
+        /* Top bar */
+        #topBar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: calc(52px + env(safe-area-inset-top));
+            padding: env(safe-area-inset-top) 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(13,13,26,0.92) 0%, transparent 100%);
+            transition: opacity 0.3s ease;
+        }
+
+        #topBar.hidden { opacity: 0; pointer-events: none; }
+
+        #backBtn {
+            background: rgba(15, 52, 96, 0.85);
+            border: 1px solid rgba(233, 69, 96, 0.5);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #backBtn svg { pointer-events: none; }
+
+        #issueTitle {
+            font-size: 14px;
+            color: #999;
+            letter-spacing: 0.5px;
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #fsBarBtn {
+            background: linear-gradient(180deg, rgba(24, 73, 131, 0.95), rgba(15, 52, 96, 0.95));
+            border: 1px solid rgba(120, 176, 255, 0.35);
+            color: #e8f1ff;
+            width: 42px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            transition: transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+        #fsBarBtn:active {
+            transform: translateY(1px) scale(0.98);
+            border-color: rgba(233, 69, 96, 0.7);
+            background: linear-gradient(180deg, rgba(29, 86, 155, 0.95), rgba(18, 62, 113, 0.95));
+        }
+        #fsBarBtn svg { pointer-events: none; }
+        #fsBarBtn.hidden { display: none; }
+
+        /* Bottom bar */
+        #bottomBar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: calc(56px + env(safe-area-inset-bottom));
+            padding-bottom: env(safe-area-inset-bottom);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            z-index: 100;
+            background: linear-gradient(to top, rgba(13,13,26,0.92) 0%, transparent 100%);
+            transition: opacity 0.3s ease;
+        }
+
+        #bottomBar.hidden { opacity: 0; pointer-events: none; }
+
+        #pageIndicator {
+            background: rgba(15, 52, 96, 0.85);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            color: #bbb;
+            padding: 8px 22px;
+            border-radius: 20px;
+            font-size: 14px;
+            white-space: nowrap;
+            min-width: 130px;
+            text-align: center;
+        }
+
+        #gridBtn {
+            background: rgba(15, 52, 96, 0.85);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            color: #bbb;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #gridBtn svg { pointer-events: none; }
+
+        /* Grid overlay */
+        #gridOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 8, 18, 0.97);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+        }
+
+        #gridOverlay.open { display: flex; }
+
+        #gridHeader {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(233, 69, 96, 0.2);
+            flex-shrink: 0;
+        }
+
+        #gridTitle { color: #aaa; font-size: 13px; }
+
+        #gridCloseBtn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 22px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #gridContent {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            flex: 1;
+            min-height: 0;
+            padding: 14px;
+        }
+
+        #gridInner {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            align-content: start;
+        }
+
+        .thumb-item {
+            cursor: pointer;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            background: #111;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .thumb-item.active { border-color: rgba(233, 69, 96, 0.9); }
+        .thumb-item img { display: block; width: 100%; height: auto; pointer-events: none; }
+        .thumb-num { text-align: center; font-size: 11px; color: #666; padding: 3px 0 5px; }
+        .thumb-item.active .thumb-num { color: rgba(233, 69, 96, 0.9); }
+
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #0d0d1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 300;
+        }
+
+        #loadingText { color: #888; font-size: 16px; }
+        #loadingBar { width: 200px; height: 3px; background: #16213e; border-radius: 2px; overflow: hidden; }
+        #loadingFill { height: 100%; background: #e94560; width: 0%; transition: width 0.3s ease; border-radius: 2px; }
+
+        .lang-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.4);
+            border-radius: 5px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .lang-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <p id="loadingText"></p>
+    <div id="loadingBar"><div id="loadingFill"></div></div>
+</div>
+
+<div id="repaintCover" style="position:fixed;inset:0;background:#0d0d1a;z-index:999;pointer-events:none;opacity:0;"></div>
+
+<!-- Each slot holds two images (A = left/only, B = right page in landscape spreads) -->
+<div id="strip">
+    <div class="slot" id="slotPrev">
+        <img class="pg" id="imgPrevA" src="" alt="">
+        <img class="pg" id="imgPrevB" src="" alt="" hidden>
+    </div>
+    <div class="slot" id="slotCurr">
+        <img class="pg" id="imgCurrA" src="" alt="">
+        <img class="pg" id="imgCurrB" src="" alt="" hidden>
+    </div>
+    <div class="slot" id="slotNext">
+        <img class="pg" id="imgNextA" src="" alt="">
+        <img class="pg" id="imgNextB" src="" alt="" hidden>
+    </div>
+</div>
+
+<div id="topBar">
+    <a href="mobile.html" id="backBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <span id="backBtnLabel"></span>
+    </a>
+    <button id="fsBarBtn" title="" aria-label="">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="8 3 3 3 3 8"></polyline>
+            <polyline points="16 3 21 3 21 8"></polyline>
+            <polyline points="21 16 21 21 16 21"></polyline>
+            <polyline points="8 21 3 21 3 16"></polyline>
+        </svg>
+    </button>
+    <span id="issueTitle"></span>
+</div>
+
+<div id="bottomBar">
+    <div id="pageIndicator"></div>
+    <button id="gridBtn" title="">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="3" y="3" width="7" height="7" rx="1.2"/>
+            <rect x="14" y="3" width="7" height="7" rx="1.2"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.2"/>
+            <rect x="14" y="14" width="7" height="7" rx="1.2"/>
+        </svg>
+    </button>
+    <button class="lang-toggle" id="langBtn"></button>
+</div>
+
+<div id="gridOverlay">
+    <div id="gridHeader">
+        <span id="gridTitle"></span>
+        <button id="gridCloseBtn">&#x2715;</button>
+    </div>
+    <div id="gridContent"><div id="gridInner"></div></div>
+</div>
+
+<script src="lang.js"></script>
+<script>
+    const t = Lang.t.bind(Lang);
+    const params  = new URLSearchParams(location.search);
+    const mag     = params.get('mag')   || 'Pelit';
+    const year    = params.get('year')  || '1992';
+    const issue   = (params.get('issue') || '01').padStart(2, '0');
+    const requestedPageNum = parseInt(params.get('page') || '1', 10);
+    const prefix  = `${mag}_${year}_${issue}`;
+    const baseDir = `/jpg/${mag}/${year}/${issue}`;
+    const magName = mag.replace(/_/g, ' ');
+
+    document.getElementById('issueTitle').textContent =
+        t('issue_title', {mag: magName, year, n: parseInt(issue, 10)});
+    document.title = `${magName} · ${year} · Issue #${parseInt(issue, 10)}`;
+    // Set initial translatable UI text (before async pages load)
+    (function initStaticLang() {
+        const backBtnLabel = document.getElementById('backBtnLabel');
+        if (backBtnLabel) backBtnLabel.textContent = t('back');
+        const langBtn = document.getElementById('langBtn');
+        if (langBtn) { const other = Lang.getLang() === 'en' ? 'EN' : 'FI'; langBtn.textContent = other; langBtn.title = other; }
+        const gridBtn = document.getElementById('gridBtn');
+        if (gridBtn) gridBtn.title = t('page_grid');
+    })();
+
+    let pages            = [];
+    let landscapeSpreads = [];  // array of URL-arrays: [[cover], [p1,p2], [p3,p4], …]
+    let currentPage      = 0;  // index into `pages`; navigation always keeps this canonical
+    let gridBuilt        = false;
+    let currImgCount     = 1;  // 1 or 2 — how many images are showing in slotCurr right now
+
+    const strip         = document.getElementById('strip');
+    const imgPrevA      = document.getElementById('imgPrevA');
+    const imgPrevB      = document.getElementById('imgPrevB');
+    const imgCurrA      = document.getElementById('imgCurrA');
+    const imgCurrB      = document.getElementById('imgCurrB');
+    const imgNextA      = document.getElementById('imgNextA');
+    const imgNextB      = document.getElementById('imgNextB');
+    const pageIndicator = document.getElementById('pageIndicator');
+    const gridBtn       = document.getElementById('gridBtn');
+    const gridOverlay   = document.getElementById('gridOverlay');
+    const gridInner     = document.getElementById('gridInner');
+    const gridCloseBtn  = document.getElementById('gridCloseBtn');
+    const topBar        = document.getElementById('topBar');
+    const bottomBar     = document.getElementById('bottomBar');
+    const loadingEl     = document.getElementById('loading');
+    const loadingText   = document.getElementById('loadingText');
+    const loadingFill   = document.getElementById('loadingFill');
+    const repaintCover  = document.getElementById('repaintCover');
+    const slotCurr      = document.getElementById('slotCurr');
+    const fsBarBtn = document.getElementById('fsBarBtn');
+    const ua = navigator.userAgent || '';
+    const isiOS = /iPad|iPhone|iPod/.test(ua)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isiOS && fsBarBtn) fsBarBtn.classList.add('hidden');
+
+    function isFullscreenActive() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function updateFullscreenButton() {
+        if (!fsBarBtn) return;
+        const active = isFullscreenActive();
+        fsBarBtn.title = t(active ? 'toggle_fullscreen' : 'enter_fullscreen');
+        fsBarBtn.setAttribute('aria-label', t(active ? 'toggle_fullscreen' : 'enter_fullscreen'));
+        fsBarBtn.innerHTML = active
+            ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                   <polyline points="9 3 9 9 3 9"></polyline>
+                   <polyline points="15 3 15 9 21 9"></polyline>
+                   <polyline points="21 15 15 15 15 21"></polyline>
+                   <polyline points="3 15 9 15 9 21"></polyline>
+               </svg>`
+            : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                   <polyline points="8 3 3 3 3 8"></polyline>
+                   <polyline points="16 3 21 3 21 8"></polyline>
+                   <polyline points="21 16 21 21 16 21"></polyline>
+                   <polyline points="8 21 3 21 3 16"></polyline>
+               </svg>`;
+    }
+
+    async function toggleFullscreen() {
+        try {
+            if (isFullscreenActive()) {
+                if (document.exitFullscreen) await document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            } else {
+                const el = document.documentElement;
+                if (el.requestFullscreen) await el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            }
+        } catch (_) {
+            // Ignore fullscreen rejections (browser policy or unsupported mode).
+        } finally {
+            updateFullscreenButton();
+            showUI();
+        }
+    }
+
+    (function initFullscreenButton() {
+        if (isiOS || !fsBarBtn) return;
+        updateFullscreenButton();
+        fsBarBtn.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+    })();
+
+    // ---- Page discovery ----
+
+    function pageUrl(n) {
+        return `${baseDir}/${prefix}_${String(n).padStart(3, '0')}.jpg`;
+    }
+
+    async function discoverPages() {
+        const manifest   = await fetch('/manifest.json').then(r => r.json());
+        const pageCount  = ((manifest[mag] || {})[year] || {})[issue] || 0;
+        loadingFill.style.width = '100%';
+        return Array.from({ length: pageCount }, (_, i) => pageUrl(i + 1));
+    }
+
+    function thumbUrl(url) {
+        const slash = url.lastIndexOf('/');
+        return url.slice(0, slash) + '/thumbnails' + url.slice(slash);
+    }
+
+    // ---- Spread layout ----
+    // Portrait:  show one page at a time  (currentPage ± 1)
+    // Landscape: show paired spreads — cover single, then page pairs
+
+    function isLandscape() {
+        // window.orientation is set instantly on rotation (no viewport-settle delay).
+        // 0 / 180 = portrait, ±90 = landscape.
+        if (typeof window.orientation === 'number') return Math.abs(window.orientation) === 90;
+        return window.innerWidth > window.innerHeight;
+    }
+
+    function buildLandscapeSpreads(pgs) {
+        if (!pgs.length) return [];
+        const result = [[pgs[0]]];                         // cover: single
+        for (let i = 1; i < pgs.length; i += 2)
+            result.push(i + 1 < pgs.length ? [pgs[i], pgs[i + 1]] : [pgs[i]]);
+        return result;
+    }
+
+    // Which landscape spread contains page p?
+    function pageToSpreadIdx(p) { return p === 0 ? 0 : Math.ceil(p / 2); }
+
+    // First page index (in `pages`) of landscape spread si
+    function spreadStartPage(si) { return si === 0 ? 0 : 2 * si - 1; }
+
+    function getCurrDisplayUrls() {
+        if (!isLandscape()) return [pages[currentPage]];
+        return landscapeSpreads[pageToSpreadIdx(currentPage)] || [pages[currentPage]];
+    }
+
+    function getAdjacentUrls(dir) {
+        if (!isLandscape()) {
+            const p = currentPage + dir;
+            return (p >= 0 && p < pages.length) ? [pages[p]] : null;
+        }
+        const si = pageToSpreadIdx(currentPage) + dir;
+        return (si >= 0 && si < landscapeSpreads.length) ? landscapeSpreads[si] : null;
+    }
+
+    function canGoBack() {
+        return isLandscape() ? pageToSpreadIdx(currentPage) > 0 : currentPage > 0;
+    }
+
+    function canGoForward() {
+        return isLandscape()
+            ? pageToSpreadIdx(currentPage) < landscapeSpreads.length - 1
+            : currentPage < pages.length - 1;
+    }
+
+    function navigateBack() {
+        if (isLandscape()) currentPage = spreadStartPage(pageToSpreadIdx(currentPage) - 1);
+        else currentPage--;
+    }
+
+    function navigateForward() {
+        if (isLandscape()) currentPage = spreadStartPage(pageToSpreadIdx(currentPage) + 1);
+        else currentPage++;
+    }
+
+    // ---- Zoom ----
+    // Uses explicit width/height sizing (not CSS scale) so the browser samples
+    // from the full-resolution source — no blurriness when zoomed in.
+    //
+    // Image/spread centre on screen = (vw/2 + panX,  vh/2 + panY).
+    // zoomAround(cx,cy,z): keeps screen point (cx,cy) fixed as zoom changes.
+
+    let zoom = 1, panX = 0, panY = 0;
+
+    // Use the slot element's rendered dimensions — these are always in CSS pixels
+    // and consistent with CSS viewport units, unlike window.innerWidth/Height which
+    // can disagree with the CSS layout viewport on Android with display-size scaling.
+    function getVwVh() {
+        const vw = slotCurr.clientWidth  || window.innerWidth;
+        const vh = slotCurr.clientHeight || window.innerHeight;
+        return { vw, vh };
+    }
+
+    function getCurrActiveImgs() {
+        return (!imgCurrB.hidden && isLandscape()) ? [imgCurrA, imgCurrB] : [imgCurrA];
+    }
+
+    // Natural displayed size of the current spread at zoom=1.
+    function getSpreadInfo() {
+        const { vw, vh } = getVwVh();
+        const imgs = getCurrActiveImgs().filter(img => img.naturalWidth > 0);
+        if (!imgs.length) return null;
+        const gap     = imgs.length > 1 ? 3 : 0;
+        const totalAR = imgs.reduce((s, img) => s + img.naturalWidth / img.naturalHeight, 0);
+        const natH    = Math.round(Math.min(vh, (vw - gap * (imgs.length - 1)) / totalAR));
+        const natW    = imgs.map(img => Math.round(natH * img.naturalWidth / img.naturalHeight));
+        const natTotalW = natW.reduce((s, w) => s + w, 0) + gap * (imgs.length - 1);
+        return { imgs, natH, natW, natTotalW, gap };
+    }
+
+    function applyZoom() {
+        const { vw, vh } = getVwVh();
+        const info = getSpreadInfo();
+
+        // Image not loaded yet — keep existing styles and wait for the load event.
+        // Calling resetImgStyles() here drops the image into CSS auto-size mode which
+        // iOS Safari renders as a flash (full-width unconstrained image) before the
+        // load event fires and re-applies explicit sizing.
+        if (!info) return;
+
+        // Always use explicit pixel positioning (never CSS fallback).
+        // This avoids any residual max-width/max-height CSS interference after
+        // orientation changes or spread transitions.
+        // Round all pixel values to avoid subpixel rendering gaps (visible as
+        // thin white/black lines on high-DPR screens like iOS Retina).
+        const scaledH      = Math.round(info.natH * zoom);
+        const scaledW      = info.natW.map(w => Math.round(w * zoom));
+        const scaledTotalW = scaledW.reduce((s, w) => s + w, 0) + info.gap * (info.imgs.length - 1);
+        let x              = Math.round(panX + (vw - scaledTotalW) / 2);
+        const ty           = Math.round(panY + (vh - scaledH) / 2);
+
+        info.imgs.forEach((img, i) => {
+            img.style.position  = 'absolute';
+            img.style.top       = '0';
+            img.style.left      = '0';
+            img.style.maxWidth  = 'none';
+            img.style.maxHeight = 'none';
+            img.style.width     = scaledW[i] + 'px';
+            img.style.height    = scaledH + 'px';
+            img.style.transform = `translate(${x}px, ${ty}px)`;
+            x += scaledW[i] + info.gap;
+        });
+    }
+
+    function clampPan() {
+        const { vw, vh } = getVwVh();
+        const info = getSpreadInfo();
+        if (!info) return;
+        const scaledW      = info.natW.map(w => w * zoom);
+        const scaledTotalW = scaledW.reduce((s, w) => s + w, 0) + info.gap * (info.imgs.length - 1);
+        const scaledH      = info.natH * zoom;
+        const overscroll   = 24; // small elastic margin to avoid exposing large blank areas
+        if (scaledTotalW <= vw) panX = 0;
+        else {
+            const b = (scaledTotalW - vw) / 2 + overscroll;
+            panX = Math.max(-b, Math.min(b, panX));
+        }
+        if (scaledH <= vh) panY = 0;
+        else {
+            const b = (scaledH - vh) / 2 + overscroll;
+            panY = Math.max(-b, Math.min(b, panY));
+        }
+    }
+
+    // Zoom to newZ keeping screen point (cx, cy) stationary.
+    function zoomAround(cx, cy, newZ) {
+        const { vw, vh } = getVwVh();
+        const r  = newZ / zoom;
+        panX = (cx - vw / 2) * (1 - r) + panX * r;
+        panY = (cy - vh / 2) * (1 - r) + panY * r;
+        zoom = newZ;
+        clampPan();
+        applyZoom();
+    }
+
+    function resetImgStyles() {
+        [imgCurrA, imgCurrB].forEach(img => {
+            img.style.position  = '';
+            img.style.top       = '';
+            img.style.left      = '';
+            img.style.width     = '';
+            img.style.height    = '';
+            img.style.maxWidth  = '';
+            img.style.maxHeight = '';
+            img.style.transform = '';
+        });
+    }
+
+    function resetZoom() {
+        zoom = 1; panX = 0; panY = 0;
+        applyZoom();
+    }
+
+    // ---- Strip rendering ----
+
+    // Clear all explicit styles left by applyZoom() on an image pair.
+    // Used for adjacent slots so stale landscape positioning doesn't persist
+    // while those images are visible during swipe animations.
+    function clearSlotStyles(imgA, imgB) {
+        [imgA, imgB].forEach(img => {
+            img.style.position  = '';
+            img.style.top       = '';
+            img.style.left      = '';
+            img.style.width     = '';
+            img.style.height    = '';
+            img.style.maxWidth  = '';
+            img.style.maxHeight = '';
+            img.style.transform = '';
+        });
+    }
+
+    // Set src / visibility / maxWidth on an image pair for a given URL list.
+    function setSlot(imgA, imgB, urls) {
+        if (!urls || !urls.length) {
+            imgA.src = ''; imgA.hidden = true;
+            imgB.src = ''; imgB.hidden = true;
+            return;
+        }
+        const maxW = urls.length === 2 ? 'calc(50vw - 2px)' : '';
+        imgA.src = urls[0]; imgA.hidden = false; imgA.style.maxWidth = maxW;
+        if (urls[1]) { imgB.src = urls[1]; imgB.hidden = false; imgB.style.maxWidth = maxW; }
+        else         { imgB.src = '';       imgB.hidden = true; }
+    }
+
+    function updateStrip() {
+        zoom = 1; panX = 0; panY = 0;
+        // Snap position FIRST before touching slot content.
+        // The forced reflow ensures transition:none takes effect before the transform
+        // change, preventing iOS Safari from animating the snap.
+        strip.style.transition = 'none';
+        void strip.offsetHeight; // force reflow
+        strip.style.transform  = 'translateX(-100vw)';
+        const currUrls = getCurrDisplayUrls();
+        currImgCount = currUrls.length;
+        // Adjacent slots are visible during swipe animations, so always clear any
+        // stale explicit geometry before assigning their new sources.
+        clearSlotStyles(imgPrevA, imgPrevB);
+        clearSlotStyles(imgNextA, imgNextB);
+        // Do NOT call resetImgStyles() here — it drops the image into CSS auto-size mode
+        // which iOS Safari renders as a flash before applyZoom() re-applies explicit sizing.
+        // applyZoom() overwrites all explicit styles directly, so no pre-clear is needed.
+        setSlot(imgCurrA, imgCurrB, currUrls);
+        setSlot(imgPrevA, imgPrevB, getAdjacentUrls(-1));
+        setSlot(imgNextA, imgNextB, getAdjacentUrls(+1));
+        applyZoom();   // applies immediately if images are cached; load events handle the rest
+        updatePageIndicator();
+        syncPageParam();
+        if (gridBuilt) updateGridHighlight();
+    }
+
+    // Preload the next `count` pages beyond the current page into Image objects
+    // so the browser caches them before the user swipes to them.
+    const preloadCache = {};
+    function preloadAhead(fromPage, count) {
+        const limit = Math.min(fromPage + count + 1, pages.length);
+        for (let i = fromPage + 1; i < limit; i++) {
+            const url = pages[i];
+            if (url && !preloadCache[url]) {
+                const img = new Image();
+                img.src = url;
+                preloadCache[url] = img;
+            }
+        }
+    }
+
+    function updatePageIndicator() {
+        const landscape = isLandscape() && landscapeSpreads.length > 0;
+        if (landscape) {
+            const si    = pageToSpreadIdx(currentPage);
+            const sp    = landscapeSpreads[si];
+            const first = spreadStartPage(si) + 1;  // 1-based
+            if (si === 0) {
+                pageIndicator.textContent = t('cover_indicator', {total: pages.length});
+            } else if (sp.length === 2) {
+                pageIndicator.textContent =
+                    t('pages_indicator', {n: first, n1: first + 1, total: pages.length});
+            } else {
+                pageIndicator.textContent =
+                    t('page_indicator', {n: first, total: pages.length});
+            }
+        } else {
+            pageIndicator.textContent = currentPage === 0
+                ? t('cover_indicator', {total: pages.length})
+                : t('page_indicator', {n: currentPage + 1, total: pages.length});
+        }
+    }
+
+    function goTo(pageIdx) {
+        if (pageIdx < 0 || pageIdx >= pages.length) return;
+        currentPage = pageIdx;
+        updateStrip();
+        preloadAhead(currentPage, 4);
+    }
+
+    // Re-apply precise layout after images finish loading (needed for landscape 2-page spreads).
+    imgCurrA.addEventListener('load', () => { if (!imgCurrA.hidden) applyZoom(); });
+    imgCurrB.addEventListener('load', () => { if (!imgCurrB.hidden) applyZoom(); });
+
+    // Re-layout on orientation change / window resize.
+    // isLandscape() uses window.orientation (set instantly) so there is no
+    // viewport-settle race; a single debounced resize handler is sufficient.
+
+    // fullReset(): used on landscape→portrait to wipe every stale absolute style
+    // (set by applyZoom() in landscape) from every image element before rebuild.
+    // The strip is hidden for two rAF frames so the clearing is never visible.
+    function fullReset() {
+        zoom = 1; panX = 0; panY = 0;
+        strip.style.transition = 'none';
+        strip.style.opacity    = '0';
+        strip.style.willChange = 'transform, opacity';
+        void strip.offsetHeight;
+        strip.style.transform  = 'translateX(-100vw)';
+
+        // Wipe ALL inline styles from ALL images so no landscape remnants remain.
+        [imgPrevA, imgPrevB, imgCurrA, imgCurrB, imgNextA, imgNextB].forEach(img => {
+            img.style.cssText = '';
+        });
+
+        const currUrls = getCurrDisplayUrls();
+        currImgCount = currUrls.length;
+        setSlot(imgCurrA, imgCurrB, currUrls);
+        setSlot(imgPrevA, imgPrevB, getAdjacentUrls(-1));
+        setSlot(imgNextA, imgNextB, getAdjacentUrls(+1));
+
+        applyZoom();
+        updatePageIndicator();
+        if (gridBuilt) updateGridHighlight();
+
+        // Reveal after two frames: first rAF commits the new layout, second makes it visible.
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            strip.style.opacity = '1';
+            strip.style.willChange = '';
+        }));
+    }
+
+    let prevLandscape = isLandscape();
+    let resizeTimer = null;
+    const iosWebKit = (() => {
+        const ua = navigator.userAgent || '';
+        const isiOS = /iPad|iPhone|iPod/.test(ua)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isAppleWebKit = /WebKit/i.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua);
+        return isiOS && isAppleWebKit;
+    })();
+
+    function syncPageParam(reload = false) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', String(currentPage + 1));
+        if (reload) window.location.replace(url.toString());
+        else history.replaceState(null, '', url.toString());
+    }
+
+    function onResize() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            pinchActive = false;
+            panActive   = false;
+            if (!pages.length) return;
+            const nowLandscape = isLandscape();
+            const fromLandscapeToPortrait = prevLandscape && !nowLandscape;
+            const fromPortraitToLandscape = !prevLandscape && nowLandscape;
+            prevLandscape = nowLandscape;
+            if (fromLandscapeToPortrait) {
+                if (iosWebKit) {
+                    syncPageParam(true);
+                    return;
+                }
+                repaintCover.style.opacity = '1';
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        repaintCover.style.opacity = '0';
+                    });
+                });
+                fullReset();
+            } else if (fromPortraitToLandscape) {
+                updateStrip();
+            } else {
+                updateStrip();
+            }
+        }, 80);
+    }
+    window.addEventListener('orientationchange', onResize);
+    window.addEventListener('resize', onResize);
+
+    // ---- UI auto-hide ----
+    let uiTimer = null;
+    function showUI() {
+        topBar.classList.remove('hidden');
+        bottomBar.classList.remove('hidden');
+        clearTimeout(uiTimer);
+        uiTimer = setTimeout(() => {
+            topBar.classList.add('hidden');
+            bottomBar.classList.add('hidden');
+        }, 3000);
+    }
+    function hideUI() {
+        clearTimeout(uiTimer);
+        topBar.classList.add('hidden');
+        bottomBar.classList.add('hidden');
+    }
+    function toggleUI() {
+        if (!topBar.classList.contains('hidden')) hideUI();
+        else showUI();
+    }
+
+
+    // ---- Touch handling ----
+    // 2 fingers            → pinch-zoom (zoom + pan, explicit sizing for sharp rendering)
+    // 1 finger, zoom > 1   → pan
+    // 1 finger, zoom = 1   → swipe navigation (portrait: ±1 page, landscape: ±1 spread)
+    // tap (no move)        → toggle UI;  double-tap → zoom 2.5× or reset
+
+    let touchStartX = 0, touchStartY = 0;
+    let touchCurX   = 0, touchCurY   = 0;
+    let touchMoved  = false;
+    let swipeLocked = false, swipeBlocked = false;
+    let panActive   = false;
+    let panStartX = 0, panStartY = 0, panStartPanX = 0, panStartPanY = 0;
+    let pinchActive    = false;
+    let pinchSession   = false; // true from first 2-finger contact until all fingers lifted
+    let pinchStartDist = 0, pinchStartZoom = 0;
+    let pinchMidX = 0, pinchMidY = 0, pinchStartPanX = 0, pinchStartPanY = 0;
+    let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
+    let singleTapTimer = null;
+    let swipeGen = 0; // incremented on every touchstart; used to cancel orphaned transitionend callbacks
+
+    document.addEventListener('touchstart', e => {
+        if (gridOverlay.classList.contains('open')) return;
+
+        if (e.touches.length === 2) {
+            pinchActive    = true;
+            pinchSession   = true;
+            panActive      = false;
+            swipeLocked    = false;
+            swipeBlocked   = true;
+            touchMoved     = true; // never treat pinch as tap
+            strip.style.transition = 'none';
+            strip.style.transform  = 'translateX(-100vw)';
+            const t0 = e.touches[0], t1 = e.touches[1];
+            pinchStartDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            if (pinchStartDist < 8) pinchStartDist = 8; // avoid unstable ratio on very tiny distance
+            pinchStartZoom = zoom;
+            pinchMidX      = (t0.clientX + t1.clientX) / 2;
+            pinchMidY      = (t0.clientY + t1.clientY) / 2;
+            pinchStartPanX = panX;
+            pinchStartPanY = panY;
+            return;
+        }
+
+        if (e.touches.length > 1) return;
+
+        pinchActive  = false;
+        const t      = e.touches[0];
+        touchStartX  = t.clientX;
+        touchStartY  = t.clientY;
+        touchCurX    = t.clientX;
+        touchCurY    = t.clientY;
+        touchMoved   = false;
+        swipeLocked  = false;
+        swipeBlocked = false;
+        swipeGen++;
+        strip.style.transition = 'none';
+        strip.style.transform  = 'translateX(-100vw)';
+
+        if (zoom > 1) {
+            panActive    = true;
+            panStartX    = t.clientX;
+            panStartY    = t.clientY;
+            panStartPanX = panX;
+            panStartPanY = panY;
+        } else {
+            panActive = false;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+        if (gridOverlay.classList.contains('open')) return;
+
+        // Pinch
+        if (pinchActive && e.touches.length >= 2) {
+            e.preventDefault();
+            const t0 = e.touches[0], t1 = e.touches[1];
+            const dist    = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+            const newZoom = Math.max(1, Math.min(5, pinchStartZoom * dist / pinchStartDist));
+            // Compute from pinch start state each frame to avoid drift
+            const r        = newZoom / pinchStartZoom;
+            const { vw, vh } = getVwVh();
+            panX = (pinchMidX - vw / 2) * (1 - r) + pinchStartPanX * r;
+            panY = (pinchMidY - vh / 2) * (1 - r) + pinchStartPanY * r;
+            zoom = newZoom;
+            clampPan();
+            applyZoom();
+            return;
+        }
+
+        // If this touch sequence started as pinch, ignore one-finger follow-up
+        // movement until all fingers are released, so swipe/page-turn cannot fire.
+        if (pinchSession) {
+            if (e.touches.length === 1) e.preventDefault();
+            return;
+        }
+
+        if (e.touches.length !== 1) return;
+        const t = e.touches[0];
+        touchCurX = t.clientX;
+        touchCurY = t.clientY;
+
+        // Pan (single finger while zoomed)
+        if (panActive) {
+            e.preventDefault();
+            touchMoved = true;
+            panX = panStartPanX + (t.clientX - panStartX);
+            panY = panStartPanY + (t.clientY - panStartY);
+            clampPan();
+            applyZoom();
+            return;
+        }
+
+        // Swipe navigation (zoom = 1)
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        if (!swipeLocked && !swipeBlocked) {
+            if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) swipeLocked  = true;
+            else if (Math.abs(dy) > 10)                                   swipeBlocked = true;
+        }
+        if (swipeLocked) {
+            e.preventDefault();
+            touchMoved = true;
+            const atLeft  = !canGoBack()    && dx > 0;
+            const atRight = !canGoForward() && dx < 0;
+            strip.style.transform =
+                `translateX(calc(-100vw + ${atLeft || atRight ? dx * 0.2 : dx}px))`;
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchend', e => {
+        if (gridOverlay.classList.contains('open')) return;
+
+        if (pinchActive) {
+            if (e.touches.length < 2) {
+                pinchActive = false;
+                if (zoom < 1.05) resetZoom();
+            }
+            return;
+        }
+
+        if (e.touches.length > 0) return;
+
+        // End of a pinch sequence: consume this end event and reset interaction state.
+        if (pinchSession) {
+            pinchSession = false;
+            panActive = false;
+            swipeLocked = false;
+            swipeBlocked = false;
+            touchMoved = false;
+            strip.style.transition = 'transform 0.2s ease';
+            strip.style.transform  = 'translateX(-100vw)';
+            return;
+        }
+
+        panActive = false;
+
+        const endX  = e.changedTouches[0].clientX;
+        const endY  = e.changedTouches[0].clientY;
+        const moved = Math.hypot(endX - touchStartX, endY - touchStartY) > 8;
+
+        if (swipeLocked && touchMoved) {
+            const dx        = endX - touchStartX;
+            const threshold = Math.min(getVwVh().vw * 0.25, 80);
+            if (dx < -threshold && canGoForward()) {
+                const gen = swipeGen;
+                strip.style.transition = 'transform 0.28s ease';
+                strip.style.transform  = 'translateX(-200vw)';
+                strip.addEventListener('transitionend', () => {
+                    if (swipeGen !== gen) return;
+                    navigateForward(); updateStrip(); preloadAhead(currentPage, 4);
+                }, { once: true });
+            } else if (dx > threshold && canGoBack()) {
+                const gen = swipeGen;
+                strip.style.transition = 'transform 0.28s ease';
+                strip.style.transform  = 'translateX(0)';
+                strip.addEventListener('transitionend', () => {
+                    if (swipeGen !== gen) return;
+                    navigateBack(); updateStrip(); preloadAhead(currentPage, 4);
+                }, { once: true });
+            } else {
+                strip.style.transition = 'transform 0.22s ease';
+                strip.style.transform  = 'translateX(-100vw)';
+            }
+        } else if (!moved) {
+            if (e.target.closest('button, a')) {
+                // Button/link tap — let the click event handle it, just reset the hide timer
+                showUI();
+            } else {
+                const now = Date.now();
+                if (now - lastTapTime < 300 && Math.hypot(endX - lastTapX, endY - lastTapY) < 40) {
+                    if (singleTapTimer) {
+                        clearTimeout(singleTapTimer);
+                        singleTapTimer = null;
+                    }
+                    lastTapTime = 0;
+                    hideUI(); // Double-tap zoom should not reveal controls.
+                    if (zoom > 1) resetZoom();
+                    else          zoomAround(endX, endY, isLandscape() ? 3.5 : 2.5);
+                } else {
+                    lastTapTime = now; lastTapX = endX; lastTapY = endY;
+                    if (singleTapTimer) clearTimeout(singleTapTimer);
+                    singleTapTimer = setTimeout(() => {
+                        toggleUI(); // Only confirmed single taps toggle controls.
+                        singleTapTimer = null;
+                    }, 300);
+                }
+            }
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+        pinchActive = false;
+        pinchSession = false;
+        panActive = false;
+        swipeLocked = false;
+        swipeBlocked = false;
+        touchMoved = false;
+        strip.style.transition = 'none';
+        strip.style.transform = 'translateX(-100vw)';
+    }, { passive: true });
+
+    // ---- Grid ----
+    function buildGrid() {
+        document.getElementById('gridTitle').textContent =
+            t('grid_title', {mag: magName, year, n: parseInt(issue, 10), total: pages.length});
+        gridInner.innerHTML = '';
+        pages.forEach((url, idx) => {
+            const item           = document.createElement('div');
+            item.className       = 'thumb-item';
+            item.dataset.pageIdx = idx;
+
+            const img     = document.createElement('img');
+            img.src       = thumbUrl(url);
+            img.loading   = 'lazy';
+            img.draggable = false;
+            img.alt       = idx === 0 ? t('cover_label') : t('page_label', {n: idx + 1});
+
+            const num       = document.createElement('div');
+            num.className   = 'thumb-num';
+            num.textContent = idx === 0 ? t('cover_label') : idx + 1;
+
+            item.appendChild(img);
+            item.appendChild(num);
+            item.addEventListener('click', () => { goTo(idx); closeGrid(); });
+            gridInner.appendChild(item);
+        });
+        gridBuilt = true;
+    }
+
+    function updateGridHighlight() {
+        const landscape = isLandscape() && landscapeSpreads.length > 0;
+        const active    = new Set();
+        if (landscape) {
+            const si = pageToSpreadIdx(currentPage);
+            const sp = spreadStartPage(si);
+            active.add(sp);
+            if (landscapeSpreads[si] && landscapeSpreads[si].length > 1) active.add(sp + 1);
+        } else {
+            active.add(currentPage);
+        }
+        gridInner.querySelectorAll('.thumb-item').forEach(el => {
+            el.classList.toggle('active', active.has(+el.dataset.pageIdx));
+        });
+    }
+
+    function openGrid() {
+        if (!gridBuilt) buildGrid();
+        updateGridHighlight();
+        gridOverlay.classList.add('open');
+        const first = gridInner.querySelector('.active');
+        if (first) requestAnimationFrame(() => first.scrollIntoView({ block: 'center' }));
+    }
+
+    function closeGrid() { gridOverlay.classList.remove('open'); }
+
+    gridBtn.addEventListener('click', openGrid);
+    gridCloseBtn.addEventListener('click', closeGrid);
+
+    // ---- Init ----
+    (async () => {
+        loadingText.textContent = t('loading_issue', {mag: magName, year, n: parseInt(issue, 10)});
+        pages = await discoverPages();
+        if (!pages.length) {
+            loadingText.textContent = t('no_pages');
+            loadingFill.parentElement.style.display = 'none';
+            return;
+        }
+        landscapeSpreads = buildLandscapeSpreads(pages);
+        const initialPage = Number.isFinite(requestedPageNum) ? requestedPageNum - 1 : 0;
+        currentPage = Math.max(0, Math.min(pages.length - 1, initialPage));
+        loadingEl.style.display = 'none';
+        applyLang();
+        updateStrip();
+        showUI();
+    })();
+
+    function applyLang() {
+        const lang  = Lang.getLang();
+        const other = lang === 'en' ? 'EN' : 'FI';
+        const langBtn = document.getElementById('langBtn');
+        if (langBtn) { langBtn.textContent = other; langBtn.title = other; }
+        const backBtnLabel = document.getElementById('backBtnLabel');
+        if (backBtnLabel) backBtnLabel.textContent = t('back');
+        gridBtn.title = t('page_grid');
+        updateFullscreenButton();
+        // Update issue title
+        document.getElementById('issueTitle').textContent =
+            t('issue_title', {mag: magName, year, n: parseInt(issue, 10)});
+        // Refresh page indicator
+        if (pages.length) {
+            updatePageIndicator();
+            if (gridBuilt) buildGrid();
+        }
+    }
+
+    document.getElementById('langBtn').addEventListener('click', () => {
+        Lang.setLang(Lang.getLang() === 'en' ? 'fi' : 'en');
+        applyLang();
+    });
+</script>
+</body>
+</html>

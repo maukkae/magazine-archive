@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+        <title>Magazines</title>
+        <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+
+                body {
+                        font-family: Arial, sans-serif;
+                        background: #1a1a2e;
+                        height: 100vh;
+                        height: 100dvh;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        overflow: hidden;
+                        padding-top: env(safe-area-inset-top);
+                }
+
+                select {
+                        padding: 12px 24px;
+                        font-size: 18px;
+                        background: #16213e;
+                        color: #fff;
+                        border: 2px solid #0f3460;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        outline: none;
+                }
+                select:hover { border-color: #e94560; }
+
+                .carousel-container {
+                        perspective: 2000px;
+                        width: 100vw;
+                        flex: 1;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        position: relative;
+                }
+
+                .carousel {
+                        position: relative;
+                        transform-style: preserve-3d;
+                }
+
+                .cover-item {
+                        position: absolute;
+                        left: 50%;
+                        top: 50%;
+                        cursor: pointer;
+                        transform-style: preserve-3d;
+                        transition: transform 0.3s ease, opacity 0.3s ease;
+                        backface-visibility: visible;
+                }
+
+                .cover-item img {
+                        display: block;
+                        border-radius: 8px;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                        transition: transform 0.3s ease;
+                        pointer-events: none;
+                }
+
+                .cover-item:hover img { transform: scale(1.05); }
+                .cover-item.active { z-index: 50; }
+                .cover-item.active img { box-shadow: 0 20px 60px rgba(233,69,96,0.4); }
+                .cover-item:not(.active) { opacity: 0.55; }
+                .cover-item.out-of-view { opacity: 0.2; pointer-events: none; }
+
+                a { text-decoration: none; display: block; }
+
+                .nav-btn {
+                        background: rgba(15, 52, 96, 0.7);
+                        border: 1px solid rgba(233, 69, 96, 0.5);
+                        color: #fff;
+                        width: 48px;
+                        height: 48px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        position: absolute;
+                        z-index: 100;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        backdrop-filter: blur(8px);
+                        -webkit-backdrop-filter: blur(8px);
+                        transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+                }
+
+                .nav-btn svg { width: 20px; height: 20px; pointer-events: none; }
+
+                .prev { left: 20px; top: 50%; transform: translateY(-50%); }
+                .next { right: 20px; top: 50%; transform: translateY(-50%); }
+                .prev:hover { background: #e94560; border-color: #e94560; transform: translateY(-50%) scale(1.12); }
+                .next:hover { background: #e94560; border-color: #e94560; transform: translateY(-50%) scale(1.12); }
+
+                /* View toggle */
+                .controls {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        margin: 20px 0;
+                        z-index: 10;
+                }
+
+                .view-toggle {
+                        display: flex;
+                        gap: 3px;
+                        background: #16213e;
+                        border: 2px solid #0f3460;
+                        border-radius: 10px;
+                        padding: 3px;
+                }
+
+                .view-btn {
+                        background: none;
+                        border: none;
+                        color: rgba(255,255,255,0.4);
+                        cursor: pointer;
+                        width: 38px;
+                        height: 38px;
+                        border-radius: 7px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: background 0.2s, color 0.2s;
+                }
+                .view-btn svg { pointer-events: none; }
+                .view-btn.active { background: #0f3460; color: #fff; }
+                .view-btn:not(.active):hover { color: rgba(255,255,255,0.8); }
+
+                /* Cover grid */
+                #coverGrid {
+                        display: none;
+                        width: 100%;
+                        flex: 1;
+                        overflow-y: auto;
+                        padding: 20px 40px 40px;
+                }
+                #coverGrid.active { display: grid; }
+
+                .cover-grid-wrap {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                        gap: 16px;
+                        align-content: start;
+                        width: 100%;
+                }
+
+                .cover-grid-item {
+                        text-decoration: none;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        border: 2px solid transparent;
+                        background: #111827;
+                        transition: border-color 0.15s, transform 0.15s;
+                        display: block;
+                }
+                .cover-grid-item:hover { border-color: #e94560; transform: scale(1.03); }
+                .cover-grid-item img { display: block; width: 100%; height: auto; aspect-ratio: 3/4; pointer-events: none; }
+                .cover-grid-label {
+                        text-align: center;
+                        font-size: 11px;
+                        color: #555;
+                        padding: 4px 0 6px;
+                }
+
+                .year-heading {
+                        grid-column: 1 / -1;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: #e94560;
+                        letter-spacing: 1px;
+                        padding: 20px 4px 8px;
+                        border-bottom: 1px solid rgba(233, 69, 96, 0.25);
+                }
+                .year-heading:first-child { padding-top: 4px; }
+
+                /* Magazine landing */
+                #magLanding {
+                        display: none;
+                        width: 100%;
+                        flex: 1;
+                        overflow-y: auto;
+                        flex-direction: column;
+                        align-items: center;
+                        padding: 32px 40px 48px;
+                        gap: 28px;
+                }
+                #magLanding.active { display: flex; }
+
+                .landing-title {
+                        font-size: 32px;
+                        font-weight: bold;
+                        color: #e94560;
+                        letter-spacing: 4px;
+                }
+
+                .landing-header {
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;
+                        width: 100%;
+                        max-width: 900px;
+                        justify-content: space-between;
+                }
+
+                .mag-landing-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                        gap: 20px;
+                        width: 100%;
+                        max-width: 900px;
+                }
+
+                .mag-card {
+                        text-decoration: none;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        border: 2px solid transparent;
+                        background: #111827;
+                        cursor: pointer;
+                        transition: border-color 0.15s, transform 0.15s;
+                        display: block;
+                }
+                .mag-card:hover { border-color: #e94560; transform: scale(1.03); }
+                .mag-card img {
+                        display: block;
+                        width: 100%;
+                        height: auto;
+                        aspect-ratio: 3/4;
+                        pointer-events: none;
+                }
+                .mag-label {
+                        text-align: center;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #ccc;
+                        padding: 8px 4px 10px;
+                }
+
+                .lang-toggle {
+                        background: none;
+                        border: 1px solid rgba(255,255,255,0.15);
+                        color: rgba(255,255,255,0.4);
+                        border-radius: 5px;
+                        padding: 4px 8px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        letter-spacing: 1px;
+                        cursor: pointer;
+                        flex-shrink: 0;
+                        line-height: 1;
+                }
+                .lang-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+        </style>
+</head>
+<body>
+        <div class="controls">
+                <button class="view-btn" id="homeBtn" title="All magazines" style="display:none">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                        </svg>
+                </button>
+                <select id="magSelect"></select>
+                <select id="yearSelect"></select>
+                <div class="view-toggle">
+                        <button class="view-btn active" id="btnCarousel" title="Carousel view">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="8" y="3" width="8" height="13" rx="1.5"/>
+                                        <rect x="2" y="6" width="5" height="9" rx="1" opacity="0.5"/>
+                                        <rect x="17" y="6" width="5" height="9" rx="1" opacity="0.5"/>
+                                </svg>
+                        </button>
+                        <button class="view-btn" id="btnGrid" title="Grid view">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                        <rect x="3" y="3" width="7" height="7" rx="1.2"/>
+                                        <rect x="14" y="3" width="7" height="7" rx="1.2"/>
+                                        <rect x="3" y="14" width="7" height="7" rx="1.2"/>
+                                        <rect x="14" y="14" width="7" height="7" rx="1.2"/>
+                                </svg>
+                        </button>
+                </div>
+                <a href="search.html" class="view-btn" id="searchBtn" title="Search" style="text-decoration:none;font-size:18px;color:rgba(255,255,255,0.4);" onclick="event.preventDefault();window.location.assign('search.html')">&#128269;</a>
+                <button class="lang-toggle" id="langBtn"></button>
+        </div>
+
+        <div id="magLanding">
+                <div class="landing-header">
+                        <span class="landing-title">MAGAZINES</span>
+                        <a href="search.html" class="view-btn" title="Search" style="font-size:18px;color:rgba(255,255,255,0.4);" onclick="event.preventDefault();window.location.assign('search.html')">&#128269;</a>
+                        <button class="lang-toggle" id="landingLangBtn"></button>
+                </div>
+                <div class="mag-landing-grid" id="magLandingGrid"></div>
+        </div>
+        <div id="coverGrid"><div class="cover-grid-wrap" id="coverGridWrap"></div></div>
+
+        <div class="carousel-container">
+                <button class="nav-btn prev" id="prevBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                </button>
+                <div class="carousel" id="carousel"></div>
+                <button class="nav-btn next" id="nextBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 6 15 12 9 18"></polyline>
+                        </svg>
+                </button>
+        </div>
+
+        <script src="lang.js"></script>
+        <script>
+                const t = Lang.t.bind(Lang);
+                const MAGAZINES = ['Hifimaailma', 'PC-Pelit', 'Pelit', 'Pelit_Vuosikirja', 'TM'];
+
+                const carousel          = document.getElementById('carousel');
+                const magSelect         = document.getElementById('magSelect');
+                const yearSelect        = document.getElementById('yearSelect');
+                const carouselContainer = document.querySelector('.carousel-container');
+                const coverGrid         = document.getElementById('coverGrid');
+                const coverGridWrap     = document.getElementById('coverGridWrap');
+                const btnCarousel       = document.getElementById('btnCarousel');
+                const btnGrid           = document.getElementById('btnGrid');
+                const magLanding        = document.getElementById('magLanding');
+                const magLandingGrid    = document.getElementById('magLandingGrid');
+                const homeBtn           = document.getElementById('homeBtn');
+
+                // allCoversData[mag][year] = ['Mag_YYYY_NN_cover.jpg', ...]
+                const allCoversData = {};
+                let currentMag  = null;
+                let currentYear = null;
+                let covers      = [];     // filenames for currentMag + currentYear
+                let viewMode    = 'carousel';
+                let available   = [];
+                let currentIndex       = 0;
+                let currentRotationDeg = 0;
+                let pendingGridAnchor  = null;
+                const CAROUSEL_TRANSITION = 'transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+                function coverStateKey() {
+                        return `carouselCover_${currentMag}_${currentYear}`;
+                }
+
+                function saveCurrentCoverState() {
+                        if (!currentMag || !currentYear || currentYear === 'all' || !covers.length) return;
+                        const idx = Math.max(0, Math.min(currentIndex, covers.length - 1));
+                        sessionStorage.setItem(coverStateKey(), covers[idx]);
+                }
+
+                function restoreCurrentCoverState() {
+                        if (!currentMag || !currentYear || currentYear === 'all' || !covers.length) {
+                                currentIndex = 0;
+                                currentRotationDeg = 0;
+                                return;
+                        }
+                        const savedCover = sessionStorage.getItem(coverStateKey());
+                        const idx = savedCover ? covers.indexOf(savedCover) : -1;
+                        currentIndex = idx >= 0 ? idx : 0;
+                        const angleStep = 360 / covers.length;
+                        currentRotationDeg = -currentIndex * angleStep;
+                }
+
+                // Populate allCoversData from manifest.json (no HEAD probing).
+                async function loadAllData() {
+                        const manifest = await fetch('/manifest.json').then(r => r.json());
+                        for (const [mag, magData] of Object.entries(manifest)) {
+                                allCoversData[mag] = {};
+                                for (const [year, issues] of Object.entries(magData)) {
+                                        allCoversData[mag][year] = Object.keys(issues)
+                                                .sort()
+                                                .map(iss => `${mag}_${year}_${iss}_cover.jpg`);
+                                }
+                        }
+                }
+
+                // Extract year + issue from a cover filename given current mag.
+                // e.g. 'PC-Pelit_1990_01_cover.jpg' + mag='PC-Pelit' -> {yr:'1990', iss:'01'}
+                function coverParts(cover) {
+                        const rest  = cover.slice(currentMag.length + 1).replace('_cover.jpg', '');
+                        const parts = rest.split('_');
+                        return { yr: parts[0], iss: (parts[1] || '01').padStart(2, '0') };
+                }
+
+                function renderCarousel(immediate = false) {
+                        carousel.innerHTML = '';
+                        if (!covers.length) {
+                                currentIndex = 0;
+                                currentRotationDeg = 0;
+                                carousel.style.transform = 'none';
+                                return;
+                        }
+
+                        // Single-issue years: show one centered cover without 3D ring math.
+                        if (covers.length === 1) {
+                                currentIndex = 0;
+                                currentRotationDeg = 0;
+                                const cover = covers[0];
+                                const div = document.createElement('div');
+                                div.className = 'cover-item active';
+                                const link = document.createElement('a');
+                                const { yr, iss } = coverParts(cover);
+                                link.href = `viewer.html?mag=${encodeURIComponent(currentMag)}&year=${yr}&issue=${iss}`;
+
+                                const img = document.createElement('img');
+                                img.src = `/jpg/${currentMag}/${currentYear}/${cover}`;
+                                img.style.height = 'min(46vh, 40vw)';
+                                img.style.width = 'min(34vh, 30vw)';
+                                img.style.objectFit = 'contain';
+                                img.draggable = false;
+
+                                link.appendChild(img);
+                                div.appendChild(link);
+                                div.style.transform = 'translateX(-50%) translateY(-50%)';
+                                carousel.appendChild(div);
+
+                                document.querySelector('.carousel-container').style.perspective = '1200px';
+                                carousel.style.transition = immediate ? 'none' : CAROUSEL_TRANSITION;
+                                carousel.style.transform = 'rotateY(0deg)';
+                                if (immediate) {
+                                        requestAnimationFrame(() => requestAnimationFrame(() => {
+                                                carousel.style.transition = CAROUSEL_TRANSITION;
+                                        }));
+                                }
+                                saveCurrentCoverState();
+                                return;
+                        }
+
+                        const numCovers = covers.length;
+                        const angleStep = 360 / numCovers;
+                        const radius = Math.round(250 / Math.sin(Math.PI / numCovers));
+                        // Normalise apparent front-cover size across different cover counts.
+                        // Scale = P/(P-r); to keep scale constant, P must scale with r: P = r * m.
+                        // m=3 gives scale=1.5x (front cover 50% larger than at rest distance).
+                        document.querySelector('.carousel-container').style.perspective = (radius * 3) + 'px';
+
+                        covers.forEach((cover, index) => {
+                                const div = document.createElement('div');
+                                div.className = 'cover-item';
+                                if (index === currentIndex) div.classList.add('active');
+                                else {
+                                        const linearDist = Math.abs(index - currentIndex);
+                                        const circDist = Math.min(linearDist, numCovers - linearDist);
+                                        if (circDist > Math.floor(numCovers / 2))
+                                                div.classList.add('out-of-view');
+                                }
+
+                                const link = document.createElement('a');
+                                const { yr, iss } = coverParts(cover);
+                                link.href = `viewer.html?mag=${encodeURIComponent(currentMag)}&year=${yr}&issue=${iss}`;
+
+                                const img = document.createElement('img');
+                                img.src = `/jpg/${currentMag}/${currentYear}/${cover}`;
+                                img.style.height = 'min(46vh, 40vw)';
+                                img.style.width = 'min(34vh, 30vw)';
+                                img.style.objectFit = 'contain';
+                                img.draggable = false;
+
+                                link.appendChild(img);
+                                div.appendChild(link);
+
+                                // Clicking a non-front cover rotates to it instead of opening the PDF
+                                div.addEventListener('click', (e) => {
+                                        if (!div.classList.contains('active')) {
+                                                e.preventDefault();
+                                                const numCovers = covers.length;
+                                                const angleStep = 360 / numCovers;
+                                                // Take the shortest rotational path
+                                                let delta = index - currentIndex;
+                                                if (delta > numCovers / 2) delta -= numCovers;
+                                                if (delta < -numCovers / 2) delta += numCovers;
+                                                currentIndex = index;
+                                                currentRotationDeg -= delta * angleStep;
+                                                renderCarousel();
+                                        }
+                                });
+
+                                const theta = index * angleStep;
+                                div.style.transform = `translateX(-50%) translateY(-50%) rotateY(${theta}deg) translateZ(${radius}px)`;
+                                carousel.appendChild(div);
+                        });
+
+                        if (immediate) {
+                                carousel.style.transition = 'none';
+                                void carousel.offsetHeight;
+                        } else {
+                                carousel.style.transition = CAROUSEL_TRANSITION;
+                        }
+                        updateCarouselTransform();
+                        if (immediate) {
+                                requestAnimationFrame(() => requestAnimationFrame(() => {
+                                        carousel.style.transition = CAROUSEL_TRANSITION;
+                                }));
+                        }
+                        saveCurrentCoverState();
+                }
+
+                function updateCarouselTransform() {
+                        carousel.style.transform = `rotateY(${currentRotationDeg}deg)`;
+                }
+
+                function nextCover() {
+                        if (covers.length <= 1) return;
+                        const angleStep = 360 / covers.length;
+                        currentIndex = (currentIndex + 1) % covers.length;
+                        currentRotationDeg -= angleStep;
+                        renderCarousel();
+                }
+
+                function prevCover() {
+                        if (covers.length <= 1) return;
+                        const angleStep = 360 / covers.length;
+                        currentIndex = (currentIndex - 1 + covers.length) % covers.length;
+                        currentRotationDeg += angleStep;
+                        renderCarousel();
+                }
+
+                function appendCoverGridItem(cover) {
+                        const { yr, iss } = coverParts(cover);
+                        const a = document.createElement('a');
+                        a.href = `viewer.html?mag=${encodeURIComponent(currentMag)}&year=${yr}&issue=${iss}`;
+                        a.className = 'cover-grid-item';
+                        if (currentYear === 'all') {
+                                const anchorId = `year-${yr}`;
+                                a.addEventListener('click', () => {
+                                        sessionStorage.setItem(`carouselGridAnchor_${currentMag}`, anchorId);
+                                        sessionStorage.setItem(`carouselGridScroll_${currentMag}`, coverGrid.scrollTop);
+                                        history.replaceState(null, '', `#${anchorId}`);
+                                });
+                        }
+
+                        const img = document.createElement('img');
+                        img.src       = `/jpg/${currentMag}/${yr}/${cover}`;
+                        img.loading   = 'lazy';
+                        img.draggable = false;
+                        img.alt       = `Issue ${parseInt(iss, 10)}`;
+
+                        const label = document.createElement('div');
+                        label.className   = 'cover-grid-label';
+                        label.textContent = `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${yr}`;
+
+                        a.appendChild(img);
+                        a.appendChild(label);
+                        coverGridWrap.appendChild(a);
+                }
+
+                function renderGrid() {
+                        coverGridWrap.innerHTML = '';
+                        if (currentYear === 'all') {
+                                const years = Object.keys(allCoversData[currentMag] || {})
+                                        .map(Number).sort((a, b) => a - b);
+                                years.forEach(year => {
+                                        const anchorId = `year-${year}`;
+                                        const h = document.createElement('div');
+                                        h.className   = 'year-heading';
+                                        h.id          = anchorId;
+                                        const text = document.createElement('span');
+                                        text.textContent = year;
+                                        h.appendChild(text);
+                                        coverGridWrap.appendChild(h);
+                                        (allCoversData[currentMag][year] || []).forEach(appendCoverGridItem);
+                                });
+                                const savedScroll = sessionStorage.getItem(`carouselGridScroll_${currentMag}`);
+                                const hashAnchor  = /^#year-\d+$/.test(location.hash) ? location.hash.slice(1) : null;
+                                const savedAnchor = sessionStorage.getItem(`carouselGridAnchor_${currentMag}`);
+                                pendingGridAnchor = hashAnchor || savedAnchor;
+                                if (savedScroll !== null) {
+                                        // Exact scroll position is more reliable than scrollIntoView
+                                        // when images are still lazy-loading (0-height before load).
+                                        requestAnimationFrame(() => { coverGrid.scrollTop = parseInt(savedScroll, 10); });
+                                } else if (pendingGridAnchor) {
+                                        requestAnimationFrame(() => {
+                                                const el = document.getElementById(pendingGridAnchor);
+                                                if (el) el.scrollIntoView({ block: 'start' });
+                                        });
+                                }
+                        } else {
+                                (allCoversData[currentMag][currentYear] || []).forEach(appendCoverGridItem);
+                        }
+                }
+
+                function setView(mode) {
+                        // "All years" always uses grid.
+                        if (mode === 'carousel' && currentYear === 'all') {
+                                mode = 'grid';
+                        }
+                        viewMode = mode;
+                        if (mode === 'grid') {
+                                if (currentYear === 'all') {
+                                        const savedAnchor = sessionStorage.getItem(`carouselGridAnchor_${currentMag}`);
+                                        history.replaceState(null, '', savedAnchor ? `#${savedAnchor}` : '#grid');
+                                } else {
+                                        history.replaceState(null, '', '#grid');
+                                }
+                        } else {
+                                history.replaceState(null, '', '#');
+                        }
+                        sessionStorage.setItem('carouselView', mode);
+                        btnCarousel.classList.toggle('active', mode === 'carousel');
+                        btnGrid.classList.toggle('active', mode === 'grid');
+                        carouselContainer.style.display = mode === 'carousel' ? '' : 'none';
+                        coverGrid.classList.toggle('active', mode === 'grid');
+                        if (mode === 'grid') {
+                                renderGrid();
+                        } else {
+                                // Always restore saved position before showing carousel,
+                                // so grid->carousel returns directly to last issue.
+                                restoreCurrentCoverState();
+                                renderCarousel(true);
+                        }
+                }
+
+                function applyLang() {
+                        const lang  = Lang.getLang();
+                        const other = lang === 'en' ? 'EN' : 'FI';
+                        document.querySelectorAll('.lang-toggle').forEach(btn => { btn.textContent = other; btn.title = other; });
+                        homeBtn.title    = t('all_magazines');
+                        btnCarousel.title = t('carousel_view');
+                        btnGrid.title    = t('grid_view');
+                        const searchBtn  = document.getElementById('searchBtn');
+                        if (searchBtn) searchBtn.title = t('search_btn_title');
+                        // Update landing title text
+                        const landingTitleEl = document.querySelector('.landing-title');
+                        if (landingTitleEl) landingTitleEl.textContent = t('landing_title');
+                        // Re-populate year select to update translated strings
+                        if (currentMag) populateYearSelect(currentMag);
+                        if (currentYear !== undefined) yearSelect.value = currentYear;
+                }
+
+                function showMagLanding() {
+                        sessionStorage.removeItem('carouselMag');
+                        magLandingGrid.innerHTML = '';
+                        document.querySelector('.landing-title').textContent = t('landing_title');
+                        available.forEach(mag => {
+                                const years = Object.keys(allCoversData[mag] || {}).map(Number).sort((a, b) => a - b);
+                                if (!years.length) return;
+                                const latestYear = years[years.length - 1];
+                                const issues = allCoversData[mag][String(latestYear)] || [];
+                                if (!issues.length) return;
+                                const latestCover = issues[issues.length - 1];
+
+                                const card = document.createElement('a');
+                                card.className = 'mag-card';
+                                card.href = `?mag=${encodeURIComponent(mag)}`;
+                                const img = document.createElement('img');
+                                img.src       = `/jpg/${mag}/${latestYear}/${latestCover}`;
+                                img.loading   = 'lazy';
+                                img.alt       = mag.replace(/_/g, ' ');
+                                img.draggable = false;
+                                const label = document.createElement('div');
+                                label.className   = 'mag-label';
+                                label.textContent = mag.replace(/_/g, ' ');
+                                card.appendChild(img);
+                                card.appendChild(label);
+                                card.addEventListener('click', (e) => {
+                                        e.preventDefault();
+                                        sessionStorage.setItem('carouselMag', mag);
+                                        magSelect.value = mag;
+                                        switchToMag(mag, true);
+                                        const savedView = sessionStorage.getItem('carouselView');
+                                        setView(savedView || 'carousel');
+                                        showMagazineView();
+                                });
+                                magLandingGrid.appendChild(card);
+                        });
+                        magLanding.classList.add('active');
+                        carouselContainer.style.display = 'none';
+                        coverGrid.classList.remove('active');
+                        document.querySelector('.controls').style.display = 'none';
+                        homeBtn.style.display = 'none';
+                }
+
+                function showMagazineView() {
+                        magLanding.classList.remove('active');
+                        document.querySelector('.controls').style.display = '';
+                        homeBtn.style.display = '';
+                }
+
+                homeBtn.addEventListener('click', showMagLanding);
+
+                btnCarousel.addEventListener('click', () => setView('carousel'));
+                btnGrid.addEventListener('click',     () => setView('grid'));
+
+                magSelect.addEventListener('change', () => {
+                        const mag = magSelect.value;
+                        sessionStorage.setItem('carouselMag', mag);
+                        currentMag = mag;
+                        switchToMag(mag);
+                });
+
+                yearSelect.addEventListener('change', (e) => {
+                        const val = e.target.value;
+                        sessionStorage.setItem(`carouselYear_${currentMag}`, val);
+                        if (val === 'all') {
+                                currentYear = 'all';
+                                covers = [];
+                                // "Show all" only makes sense in grid view
+                                if (viewMode !== 'grid') setView('grid');
+                                else renderGrid();
+                        } else {
+                                sessionStorage.removeItem(`carouselGridAnchor_${currentMag}`);
+                                sessionStorage.removeItem(`carouselGridScroll_${currentMag}`);
+                                currentYear = parseInt(val);
+                                covers = (allCoversData[currentMag] || {})[currentYear] || [];
+                                restoreCurrentCoverState();
+                                if (viewMode === 'carousel') renderCarousel(true);
+                                else renderGrid();
+                        }
+                });
+
+                function populateYearSelect(mag) {
+                        const years = Object.keys(allCoversData[mag] || {}).map(Number).sort((a, b) => a - b);
+                        const savedVal = yearSelect.value;
+                        yearSelect.innerHTML = '';
+                        const allOpt = document.createElement('option');
+                        allOpt.value       = 'all';
+                        allOpt.textContent = t('all_years');
+                        yearSelect.appendChild(allOpt);
+                        years.forEach(year => {
+                                const opt = document.createElement('option');
+                                opt.value       = year;
+                                const count = (allCoversData[mag][year] || []).length;
+                                opt.textContent = `${year} (${t(count === 1 ? 'issues_count_singular' : 'issues_count', {n: count})})`;
+                                yearSelect.appendChild(opt);
+                        });
+                        if (savedVal) yearSelect.value = savedVal;
+                        return years;
+                }
+
+                function switchToMag(mag, suppressRender = false) {
+                        currentMag  = mag;
+                        const years = populateYearSelect(mag);
+                        if (!years.length) return;
+                        const saved = sessionStorage.getItem(`carouselYear_${mag}`);
+                        if (saved === 'all') {
+                                currentYear = 'all';
+                                covers      = [];
+                        } else {
+                                const savedYear = parseInt(saved);
+                                currentYear = (savedYear && years.includes(savedYear)) ? savedYear : years[years.length - 1];
+                                covers = (allCoversData[mag] || {})[currentYear] || [];
+                        }
+                        yearSelect.value = currentYear;
+                        restoreCurrentCoverState();
+
+                        // All-years is grid-only; force mode before any render path.
+                        if (currentYear === 'all') {
+                                if (viewMode !== 'grid') viewMode = 'grid';
+                                if (!suppressRender) setView('grid');
+                                return;
+                        }
+
+                        if (!suppressRender) {
+                                if (viewMode === 'carousel') renderCarousel(true);
+                                else renderGrid();
+                        }
+                }
+
+                document.addEventListener('keydown', (e) => {
+                        if (e.key === 'ArrowRight' || e.key === ' ') nextCover();
+                        if (e.key === 'ArrowLeft') prevCover();
+                });
+
+                document.getElementById('prevBtn').addEventListener('click', prevCover);
+                document.getElementById('nextBtn').addEventListener('click', nextCover);
+
+                // Drag support
+                let isDragging = false;
+                let hasDragged = false;
+                let startX = 0;
+                let initialRotation = 0;
+
+                document.querySelector('.carousel-container').addEventListener('mousedown', (e) => {
+                        if (e.button !== 0 || e.target.closest('.nav-btn')) return;
+                        e.preventDefault();
+                        isDragging = true;
+                        hasDragged = false;
+                        startX = e.clientX;
+                        const numCovers = covers.length;
+                        const angleStep = 360 / numCovers;
+                        initialRotation = currentRotationDeg;
+                        carousel.style.transition = 'none';
+                        document.body.style.userSelect = 'none';
+                        // Remove stale opacity classes so covers don't fade mid-drag
+                        carousel.querySelectorAll('.out-of-view').forEach(el => el.classList.remove('out-of-view'));
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                        if (!isDragging) return;
+                        const delta = e.clientX - startX;
+                        if (Math.abs(delta) > 4) hasDragged = true;
+                        carousel.style.transform = `rotateY(${initialRotation + delta * 0.15}deg)`;
+                });
+
+                document.addEventListener('mouseup', () => {
+                        if (!isDragging) return;
+                        isDragging = false;
+                        document.body.style.userSelect = '';
+
+                        if (hasDragged) {
+                                const numCovers = covers.length;
+                                const angleStep = 360 / numCovers;
+                                const match = carousel.style.transform.match(/rotateY\((-?[\d.]+)/);
+                                const cur = match ? parseFloat(match[1]) : 0;
+                                let snapped = Math.round(-cur / angleStep) % numCovers;
+                                if (snapped < 0) snapped += numCovers;
+                                currentIndex = snapped;
+
+                                // Snap to the nearest equivalent angle (no long wrap).
+                                // nearbyAngle differs from cur by at most half a step.
+                                const canonicalAngle = -currentIndex * angleStep;
+                                const rounds = Math.round((cur - canonicalAngle) / 360);
+                                const nearbyAngle = canonicalAngle + rounds * 360;
+                                currentRotationDeg = nearbyAngle;
+                                carousel.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                                carousel.style.transform = `rotateY(${nearbyAngle}deg)`;
+
+                                // After snap, rebuild DOM (sets same nearbyAngle via updateCarouselTransform, no jump)
+                                carousel.addEventListener('transitionend', () => {
+                                        carousel.style.transition = 'none';
+                                        renderCarousel();
+                                        requestAnimationFrame(() => { carousel.style.transition = CAROUSEL_TRANSITION; });
+                                }, { once: true });
+                        } else {
+                                carousel.style.transition = CAROUSEL_TRANSITION;
+                        }
+                });
+
+                // Block link clicks that were preceded by a drag
+                document.addEventListener('click', (e) => {
+                        if (hasDragged) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                hasDragged = false;
+                        }
+                }, true);
+
+                document.addEventListener('mouseleave', () => {
+                        if (isDragging) {
+                                // Treat like mouseup
+                                document.dispatchEvent(new MouseEvent('mouseup'));
+                        }
+                });
+
+                // Mouse wheel support (carousel view only)
+                let wheelCooldown = false;
+                document.addEventListener('wheel', (e) => {
+                        if (viewMode !== 'carousel' || wheelCooldown) return;
+                        e.preventDefault();
+                        wheelCooldown = true;
+                        setTimeout(() => { wheelCooldown = false; }, 400);
+                        if (e.deltaY > 0 || e.deltaX > 0) nextCover();
+                        else prevCover();
+                }, { passive: false });
+
+                // Touch support
+                let touchStartX = 0;
+                carousel.addEventListener('touchstart', (e) => {
+                        touchStartX = e.touches[0].clientX;
+                }, { passive: true });
+
+                document.addEventListener('touchend', (e) => {
+                        const delta = e.changedTouches[0].clientX - touchStartX;
+                        if (Math.abs(delta) > 50) {
+                                if (delta < 0) nextCover();
+                                else prevCover();
+                        }
+                });
+
+                (async () => {
+                        await loadAllData();
+
+                        available = MAGAZINES.filter(mag =>
+                                Object.keys(allCoversData[mag] || {}).length > 0
+                        );
+                        if (!available.length) return;
+
+                        available.forEach(mag => {
+                                const opt = document.createElement('option');
+                                opt.value       = mag;
+                                opt.textContent = mag.replace(/_/g, ' ');
+                                magSelect.appendChild(opt);
+                        });
+
+                        // Restore saved magazine (URL param takes priority), or show the landing page
+                        const urlMag   = new URLSearchParams(location.search).get('mag');
+                        const savedMag = sessionStorage.getItem('carouselMag');
+                        currentMag = (urlMag   && available.includes(urlMag))   ? urlMag
+                                   : (savedMag && available.includes(savedMag)) ? savedMag
+                                   : null;
+                        if (currentMag) {
+                                magSelect.value = currentMag;
+                                const savedView = sessionStorage.getItem('carouselView');
+                                switchToMag(currentMag, true);
+                                setView(savedView || ((location.hash === '#grid' || location.hash.startsWith('#year-')) ? 'grid' : 'carousel'));
+                                showMagazineView();
+                        } else {
+                                showMagLanding();
+                        }
+                        applyLang();
+                })();
+
+                // Language toggle (both controls bar and landing header)
+                document.querySelectorAll('.lang-toggle').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                                Lang.setLang(Lang.getLang() === 'en' ? 'fi' : 'en');
+                                applyLang();
+                        });
+                });
+
+                // When returning via browser back/forward cache, force an immediate
+                // non-animated render so the carousel never "rolls in" from issue 1.
+                window.addEventListener('pageshow', () => {
+                        if (viewMode === 'carousel' && covers.length) {
+                                restoreCurrentCoverState();
+                                renderCarousel(true);
+                        }
+                });
+        </script>
+</body>
+</html>

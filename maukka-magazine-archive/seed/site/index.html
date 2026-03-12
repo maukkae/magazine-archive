@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magazines</title>
+    <script>
+        // pointer: coarse = touch-primary device (phone / tablet)
+        // pointer: fine   = mouse-primary device (desktop / laptop)
+        // location.replace() skips this page in browser history so Back works correctly.
+        const isMobile = window.matchMedia('(pointer: coarse)').matches;
+        sessionStorage.removeItem('mobileMag');
+        sessionStorage.removeItem('carouselMag');
+        location.replace(isMobile ? 'mobile.html' : 'carousel.html');
+    </script>
+    <noscript>
+        <meta http-equiv="refresh" content="0;url=carousel.html">
+    </noscript>
+    <style>body { background: #0d0d1a; }</style>
+</head>
+<body></body>
+</html>

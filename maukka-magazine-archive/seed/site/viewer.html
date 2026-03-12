@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magazines</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d0d1a;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        body.scrollable {
+            overflow: auto;
+            height: auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+            cursor: grab;
+        }
+
+        body.scrollable.panning { cursor: grabbing; }
+
+        #stage {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        body.scrollable #stage {
+            height: auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 60px 80px;
+            width: max-content;
+            min-width: 100vw;
+            overflow: visible;
+        }
+
+        #spread {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            cursor: zoom-in;
+        }
+
+        body.scrollable #spread { cursor: grab; }
+        body.scrollable.panning #spread { cursor: grabbing; }
+
+        #spread img, #ghost img {
+            display: block;
+            max-height: calc(100vh - 80px);
+            max-height: calc(100dvh - 80px);
+            max-width: calc(49vw - 50px);
+            width: auto;
+            height: auto;
+            box-shadow: 0 20px 80px rgba(0,0,0,0.9);
+            border-radius: 2px;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
+
+        #spread.single img, #ghost.single img { max-width: calc(100vw - 160px); }
+
+        #ghost {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            pointer-events: none;
+        }
+        #ghost.active { display: flex; }
+
+        body.scrollable #spread img,
+        body.scrollable #ghost img {
+            max-height: none;
+            max-width: none;
+            /* height & width set by JS via applyZoomLevel / showGhost */
+        }
+
+        /* Top bar */
+        #topBar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 7px 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 200;
+            background: linear-gradient(to bottom, rgba(13,13,26,0.95) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        #backBtn {
+            background: rgba(15, 52, 96, 0.8);
+            border: 1px solid rgba(233, 69, 96, 0.5);
+            color: #fff;
+            padding: 7px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: background 0.2s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            pointer-events: all;
+        }
+
+        #backBtn:hover { background: #e94560; border-color: #e94560; }
+        #backBtn svg { pointer-events: none; }
+
+        #issueTitle { font-size: 15px; color: #999; letter-spacing: 0.5px; }
+
+        /* Nav buttons — hidden by default, shown on edge hover via JS */
+        .nav-btn {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(15, 52, 96, 0.75);
+            border: 1px solid rgba(233, 69, 96, 0.5);
+            color: #fff;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            opacity: 0;
+            transition: opacity 0.25s ease, background 0.2s, border-color 0.2s, transform 0.2s;
+            pointer-events: none;
+        }
+
+        .nav-btn.visible { opacity: 1; pointer-events: all; }
+        .nav-btn:disabled { opacity: 0 !important; pointer-events: none !important; }
+        .nav-btn.edge-hot {
+            background: #e94560;
+            border-color: #e94560;
+        }
+
+        .nav-btn svg { width: 22px; height: 22px; pointer-events: none; }
+
+        #prevBtn { left: 16px; }
+        #nextBtn { right: 16px; }
+
+        #prevBtn.visible:hover {
+            background: #e94560;
+            border-color: #e94560;
+            transform: translateY(-50%) scale(1.1);
+        }
+        #nextBtn.visible:hover {
+            background: #e94560;
+            border-color: #e94560;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        /* Bottom bar */
+        #bottomBar {
+            position: fixed;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 200;
+        }
+
+        #pageIndicator {
+            background: rgba(15, 52, 96, 0.75);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            color: #bbb;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            white-space: nowrap;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            min-width: 120px;
+            justify-content: center;
+            transition: border-color 0.2s;
+        }
+        #pageIndicator:hover { border-color: rgba(233, 69, 96, 0.7); }
+
+        #pageInput {
+            display: none;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 13px;
+            text-align: center;
+            outline: none;
+            width: 70px;
+            -moz-appearance: textfield;
+        }
+        #pageInput::-webkit-inner-spin-button,
+        #pageInput::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+        #gridBtn {
+            background: rgba(15, 52, 96, 0.75);
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            color: #bbb;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+        #gridBtn:hover { background: #e94560; border-color: #e94560; color: #fff; }
+        #gridBtn svg { pointer-events: none; }
+
+        /* Grid overlay */
+        #gridOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(8, 8, 18, 0.97);
+            z-index: 250;
+            display: none;
+            flex-direction: column;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        #gridOverlay.open { display: flex; }
+
+        #gridHeader {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(233, 69, 96, 0.2);
+            flex-shrink: 0;
+        }
+        #gridTitle { color: #aaa; font-size: 14px; }
+        #gridHeaderRight {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        #tagBar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .tag-control {
+            background: rgba(15, 52, 96, 0.75);
+            border: 1px solid rgba(233, 69, 96, 0.25);
+            color: #ddd;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            min-height: 36px;
+        }
+        #tagSelect { min-width: 150px; }
+        #tagInput { min-width: 170px; }
+        #tagModeBtn {
+            background: rgba(15, 52, 96, 0.75);
+            border: 1px solid rgba(233, 69, 96, 0.35);
+            color: #ddd;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        #tagModeBtn.active {
+            background: rgba(233, 69, 96, 0.9);
+            border-color: rgba(233, 69, 96, 1);
+            color: #fff;
+        }
+        #tagStatus {
+            color: #999;
+            font-size: 12px;
+            min-width: 160px;
+            text-align: right;
+        }
+
+        #gridCloseBtn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, color 0.2s;
+        }
+        #gridCloseBtn:hover { background: #e94560; color: #fff; }
+
+        #gridContent {
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+            padding: 20px;
+        }
+
+        #gridInner {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            align-content: start;
+        }
+
+        .thumb-item {
+            cursor: pointer;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            background: #111;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .thumb-item:hover { border-color: #e94560; transform: scale(1.03); }
+        .thumb-item.active-spread { border-color: rgba(233, 69, 96, 0.9); }
+        .thumb-item.tagging-mode { cursor: copy; }
+        .thumb-item img { display: block; width: 100%; height: auto; pointer-events: none; }
+        .thumb-num {
+            text-align: center;
+            font-size: 13px;
+            color: #888;
+            padding: 4px 0 6px;
+        }
+        .thumb-item.active-spread .thumb-num { color: rgba(233, 69, 96, 0.9); }
+        .thumb-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 0 6px 8px;
+        }
+        .thumb-tag {
+            background: rgba(233, 69, 96, 0.92);
+            color: #fff;
+            font-size: 10px;
+            line-height: 1;
+            padding: 4px 6px;
+            border-radius: 999px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+        }
+
+        /* Zoom controls */
+        #zoomControls {
+            position: fixed;
+            top: 7px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 200;
+            background: rgba(15, 52, 96, 0.8);
+            border: 1px solid rgba(233, 69, 96, 0.4);
+            border-radius: 24px;
+            padding: 5px 10px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            user-select: none;
+        }
+
+        .zoom-ctrl-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s;
+            padding: 0;
+        }
+        .zoom-ctrl-btn:hover { background: rgba(233, 69, 96, 0.3); }
+        .zoom-ctrl-btn:active { background: #e94560; }
+        .zoom-ctrl-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+
+        #zoomSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 6px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.28), rgba(255,255,255,0.14));
+            border-radius: 999px;
+            outline: none;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        #zoomSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #f2f4f8;
+            cursor: pointer;
+            border: 1px solid rgba(15, 52, 96, 0.45);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+        }
+        #zoomSlider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #f2f4f8;
+            border: 1px solid rgba(15, 52, 96, 0.45);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+            cursor: pointer;
+        }
+
+        #zoomLabel {
+            font-size: 12px;
+            color: #aaa;
+            min-width: 36px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .zoom-sep {
+            width: 1px;
+            height: 20px;
+            background: rgba(255,255,255,0.15);
+            margin: 0 2px;
+        }
+
+        .lang-toggle {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.4);
+            border-radius: 5px;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            flex-shrink: 0;
+            line-height: 1;
+            pointer-events: all;
+        }
+        .lang-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #0d0d1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 300;
+        }
+
+        #loadingText { color: #888; font-size: 18px; }
+
+        #loadingBar {
+            width: 220px;
+            height: 3px;
+            background: #16213e;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        #loadingFill {
+            height: 100%;
+            background: #e94560;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <p id="loadingText"></p>
+    <div id="loadingBar"><div id="loadingFill"></div></div>
+</div>
+
+<div id="zoomControls">
+    <button class="zoom-ctrl-btn" id="zoomOutBtn" title="" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <input type="range" id="zoomSlider" min="1" max="4" step="0.05" value="1">
+    <button class="zoom-ctrl-btn" id="zoomInBtn" title="">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <span id="zoomLabel">100%</span>
+    <div class="zoom-sep"></div>
+    <button class="zoom-ctrl-btn" id="fitBtn" title="" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+    </button>
+    <button class="zoom-ctrl-btn" id="viewModeBtn" title="">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="5" width="7" height="14" rx="1.4"></rect>
+            <rect x="13" y="5" width="7" height="14" rx="1.4"></rect>
+        </svg>
+    </button>
+</div>
+
+<div id="topBar">
+    <a href="carousel.html" id="backBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <span id="backBtnLabel"></span>
+    </a>
+    <span id="issueTitle"></span>
+    <button class="lang-toggle" id="langBtn"></button>
+</div>
+
+<div id="stage">
+    <div id="spread"></div>
+    <div id="ghost"></div>
+</div>
+
+<button class="nav-btn" id="prevBtn" disabled>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+</button>
+
+<button class="nav-btn" id="nextBtn" disabled>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="9 6 15 12 9 18"></polyline>
+    </svg>
+</button>
+
+<div id="bottomBar">
+    <div id="pageIndicator" title="">
+        <span id="pageLabel"></span>
+        <input type="number" id="pageInput" min="1">
+    </div>
+    <button id="gridBtn" title="">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="3" y="3" width="7" height="7" rx="1.2"/>
+            <rect x="14" y="3" width="7" height="7" rx="1.2"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.2"/>
+            <rect x="14" y="14" width="7" height="7" rx="1.2"/>
+        </svg>
+    </button>
+</div>
+
+<div id="gridOverlay">
+    <div id="gridHeader">
+        <span id="gridTitle"></span>
+        <div id="gridHeaderRight">
+            <div id="tagBar">
+                <select id="tagSelect" class="tag-control">
+                    <option value="ad_fullpage">ad_fullpage</option>
+                </select>
+                <input id="tagInput" class="tag-control" type="text" placeholder="new tag">
+                <button id="tagModeBtn" type="button">Tag Pages</button>
+                <span id="tagStatus"></span>
+            </div>
+            <button id="gridCloseBtn">&#x2715;</button>
+        </div>
+    </div>
+    <div id="gridContent"><div id="gridInner"></div></div>
+</div>
+
+<script src="lang.js"></script>
+<script>
+    const t = Lang.t.bind(Lang);
+    const params  = new URLSearchParams(location.search);
+    const mag     = params.get('mag')   || 'Pelit';
+    const year    = params.get('year')  || '1992';
+    const issue   = (params.get('issue') || '01').padStart(2, '0');
+    const requestedPageNum = parseInt(params.get('page') || '1', 10);
+    const refParam = params.get('ref');  // 'search' when opened from search results
+    const openGridOnLoad = params.get('grid') === '1';
+    const startTaggingOnLoad = params.get('tagging') === '1';
+    const prefix  = `${mag}_${year}_${issue}`;
+    const baseDir = `/jpg/${mag}/${year}/${issue}`;
+    const magName = mag.replace(/_/g, ' ');
+    const adminApiBase = params.get('adminApi');
+    const canTagPages = Boolean(adminApiBase);
+
+    document.getElementById('issueTitle').textContent =
+        t('issue_title_desktop', {mag: magName, year, n: parseInt(issue, 10)});
+    document.title = `${magName} ${year} / ${parseInt(issue, 10)}`;
+    // Set initial translatable UI text (before async pages load)
+    (function initStaticLang() {
+        const backBtnLabel = document.getElementById('backBtnLabel');
+        if (backBtnLabel) backBtnLabel.textContent = t('back');
+        const langBtn = document.getElementById('langBtn');
+        if (langBtn) { const other = Lang.getLang() === 'en' ? 'EN' : 'FI'; langBtn.textContent = other; langBtn.title = other; }
+        document.getElementById('zoomOutBtn').title = t('zoom_out');
+        document.getElementById('zoomInBtn').title  = t('zoom_in');
+        document.getElementById('fitBtn').title     = t('fit_page');
+        document.getElementById('gridBtn').title    = t('page_grid');
+        document.getElementById('pageIndicator').title = t('click_to_jump');
+    })();
+
+    let spreads       = [];
+    let allPages      = [];
+    let totalPages    = 0;
+    let currentSpread = 0;
+    let viewMode      = 'spread'; // 'spread' | 'single'
+    let isZoomed      = false;
+    let zoomLevel     = 1.0;
+    let fitHeight     = 0;   // actual rendered height of spread images in fit mode
+    let hasDragged    = false;
+    let dragStartX    = 0;
+    let lastDragX     = 0;
+    let lastDragY     = 0;
+    let isPanning     = false;
+    let touchStartX   = 0;
+    let touchStartY   = 0;
+    let pendingShowToken = 0;
+    const pageImageCache = new Map();
+
+    const spreadEl      = document.getElementById('spread');
+    const stageEl       = document.getElementById('stage');
+    const ghostEl       = document.getElementById('ghost');
+    const zoomSlider    = document.getElementById('zoomSlider');
+    const zoomLabel     = document.getElementById('zoomLabel');
+    const zoomOutBtn    = document.getElementById('zoomOutBtn');
+    const zoomInBtn     = document.getElementById('zoomInBtn');
+    const fitBtn        = document.getElementById('fitBtn');
+    const viewModeBtn   = document.getElementById('viewModeBtn');
+    const prevBtn       = document.getElementById('prevBtn');
+    const nextBtn       = document.getElementById('nextBtn');
+    const pageIndicator = document.getElementById('pageIndicator');
+    const pageLabel     = document.getElementById('pageLabel');
+    const pageInput     = document.getElementById('pageInput');
+    const gridBtn       = document.getElementById('gridBtn');
+    const gridOverlay   = document.getElementById('gridOverlay');
+    const gridContent   = document.getElementById('gridContent');
+    const gridInner     = document.getElementById('gridInner');
+    const gridCloseBtn  = document.getElementById('gridCloseBtn');
+    const tagBar        = document.getElementById('tagBar');
+    const tagSelect     = document.getElementById('tagSelect');
+    const tagInput      = document.getElementById('tagInput');
+    const tagModeBtn    = document.getElementById('tagModeBtn');
+    const tagStatus     = document.getElementById('tagStatus');
+    const loadingEl     = document.getElementById('loading');
+    const loadingText   = document.getElementById('loadingText');
+    const loadingFill   = document.getElementById('loadingFill');
+    const backBtn       = document.getElementById('backBtn');
+
+    // --- Page discovery ---
+
+    function pageUrl(n) {
+        return `${baseDir}/${prefix}_${String(n).padStart(3, '0')}.jpg`;
+    }
+
+    const preloaded = new Set();
+    function getCachedImageRecord(url) {
+        let record = pageImageCache.get(url);
+        if (record) return record;
+        const img = new Image();
+        const promise = new Promise((resolve) => {
+            const finish = () => {
+                if (typeof img.decode === 'function') {
+                    img.decode().catch(() => {}).finally(() => resolve(img));
+                    return;
+                }
+                resolve(img);
+            };
+            if (img.complete && img.naturalHeight) {
+                finish();
+                return;
+            }
+            img.addEventListener('load', finish, { once: true });
+            img.addEventListener('error', () => resolve(img), { once: true });
+        });
+        record = { img, promise };
+        pageImageCache.set(url, record);
+        return record;
+    }
+
+    function warmImage(url) {
+        const record = getCachedImageRecord(url);
+        if (!record.img.src) record.img.src = url;
+        return record.promise;
+    }
+
+    function preloadAhead(spreadIndex, count = 2) {
+        for (let i = 1; i <= count; i++) {
+            const idx = spreadIndex + i;
+            if (idx >= spreads.length) break;
+            spreads[idx].pages.forEach(url => {
+                if (preloaded.has(url)) return;
+                preloaded.add(url);
+                warmImage(url);
+            });
+        }
+    }
+
+    async function discoverPages() {
+        const manifest  = await fetch('/manifest.json').then(r => r.json());
+        const pageCount = ((manifest[mag] || {})[year] || {})[issue] || 0;
+        loadingFill.style.width = '100%';
+        return Array.from({ length: pageCount }, (_, i) => pageUrl(i + 1));
+    }
+
+    function buildSpreads(pages) {
+        const result = [];
+        if (!pages.length) return result;
+        if (viewMode === 'single') {
+            for (let i = 0; i < pages.length; i++) {
+                result.push({ pages: [pages[i]], single: true });
+            }
+        } else {
+            result.push({ pages: [pages[0]], single: true });
+            for (let i = 1; i < pages.length; i += 2) {
+                const s = { pages: [pages[i]], single: false };
+                if (i + 1 < pages.length) s.pages.push(pages[i + 1]);
+                else s.single = true;
+                result.push(s);
+            }
+        }
+        return result;
+    }
+
+    // --- Display ---
+
+    function spreadLabel(index) {
+        if (viewMode === 'single') {
+            return index === 0
+                ? t('cover_indicator', {total: totalPages})
+                : t('page_indicator', {n: index + 1, total: totalPages});
+        }
+        if (index === 0) return t('cover_indicator', {total: totalPages});
+        const first = index * 2;
+        const s     = spreads[index];
+        return s.single
+            ? t('page_indicator', {n: first, total: totalPages})
+            : t('pages_indicator', {n: first, n1: first + 1, total: totalPages});
+    }
+
+    function spreadToFirstPage(index) {
+        return viewMode === 'single'
+            ? index + 1
+            : (index === 0 ? 1 : index * 2);
+    }
+
+    function pageToSpread(page) {
+        if (viewMode === 'single') return page - 1;
+        return page <= 1 ? 0 : Math.floor(page / 2);
+    }
+
+    function updateViewModeButton() {
+        const singleIcon = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="7" y="4" width="10" height="16" rx="1.6"></rect>
+            </svg>`;
+        const spreadIcon = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="5" width="7" height="14" rx="1.4"></rect>
+                <rect x="13" y="5" width="7" height="14" rx="1.4"></rect>
+            </svg>`;
+
+        viewModeBtn.title = viewMode === 'spread'
+            ? t('single_page_view')
+            : t('spread_view');
+        viewModeBtn.innerHTML = viewMode === 'spread' ? singleIcon : spreadIcon;
+        viewModeBtn.style.color = '#fff';
+    }
+
+    function syncPageParam() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', String(spreadToFirstPage(currentSpread)));
+        url.searchParams.delete('ref');
+        history.replaceState(null, '', url.toString());
+    }
+
+    // Old Safari compatibility: avoid Element.closest() dependency.
+    function isInteractiveTarget(node) {
+        while (node && node !== document) {
+            if (node.tagName) {
+                const tag = String(node.tagName).toUpperCase();
+                if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT') return true;
+            }
+            node = node.parentNode;
+        }
+        return false;
+    }
+
+    // Old Safari compatibility: classList.toggle(token, force) may throw.
+    function setClass(el, className, on) {
+        if (!el) return;
+        if (on) el.classList.add(className);
+        else el.classList.remove(className);
+    }
+
+    // Old Safari may throw on scrollIntoView options object.
+    function safeScrollIntoViewCenter(el) {
+        if (!el || typeof el.scrollIntoView !== 'function') return;
+        try {
+            el.scrollIntoView({ block: 'center' });
+        } catch (_) {
+            el.scrollIntoView(true);
+        }
+    }
+
+    function cameFromBrowsingPage() {
+        if (!document.referrer) return false;
+        try {
+            const ref = new URL(document.referrer);
+            return ref.origin === window.location.origin &&
+                /\/(carousel|search)\.html$/i.test(ref.pathname);
+        } catch {
+            return false;
+        }
+    }
+
+    function setDirectReturnStateForCarousel() {
+        // Preselect magazine/year and issue cover for direct-entry fallback.
+        sessionStorage.setItem('carouselMag', mag);
+        // Preserve "All years" mode if the user was in it — only overwrite with
+        // specific year when coming from a single-year view.
+        const savedYear = sessionStorage.getItem(`carouselYear_${mag}`);
+        if (savedYear === 'all') {
+            sessionStorage.setItem(`carouselGridAnchor_${mag}`, `year-${year}`);
+        } else {
+            sessionStorage.setItem(`carouselYear_${mag}`, year);
+        }
+        sessionStorage.setItem(`carouselCover_${mag}_${year}`, `${prefix}_cover.jpg`);
+        // Respect existing user mode preference; default to carousel only if unset.
+        if (!sessionStorage.getItem('carouselView')) {
+            sessionStorage.setItem('carouselView', 'carousel');
+        }
+    }
+
+    backBtn.addEventListener('click', e => {
+        if (e.defaultPrevented) return;
+        if (e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+
+        if (refParam === 'search' || (cameFromBrowsingPage() && window.history.length > 1)) {
+            window.history.back();
+            return;
+        }
+
+        setDirectReturnStateForCarousel();
+        window.location.href = 'carousel.html';
+    });
+
+    function applySpread(index) {
+        if (!isZoomed) fitHeight = 0;  // preserve fitHeight when staying zoomed
+        const s = spreads[index];
+        spreadEl.innerHTML = '';
+        spreadEl.className = s.single ? 'single' : '';
+        s.pages.forEach(url => {
+            const cached = pageImageCache.get(url);
+            const img = cached ? cached.img.cloneNode(false) : document.createElement('img');
+            img.src = url;
+            img.draggable = false;
+            spreadEl.appendChild(img);
+        });
+        prevBtn.disabled = index === 0;
+        nextBtn.disabled = index === spreads.length - 1;
+        pageLabel.textContent = spreadLabel(index);
+        pageInput.style.display = 'none';
+        pageLabel.style.display = '';
+        currentSpread = index;
+
+        // Fit pages to viewport once loaded
+        const imgs = Array.from(spreadEl.querySelectorAll('img'));
+        let remaining = imgs.filter(i => !i.complete || !i.naturalHeight).length;
+        if (remaining === 0) {
+            fitSpread();
+        } else {
+            imgs.forEach(img => {
+                if (!img.complete || !img.naturalHeight)
+                    img.addEventListener('load', () => { if (--remaining === 0) fitSpread(); }, { once: true });
+            });
+        }
+    }
+
+    function calcFitHeight(imgs, isSingle) {
+        const stage    = document.getElementById('stage');
+        const stageH   = stage.clientHeight || window.innerHeight;
+        const stageW   = stage.clientWidth  || window.innerWidth;
+        const topBarEl = document.getElementById('topBar');
+        const botBarEl = document.getElementById('bottomBar');
+        const topH     = topBarEl ? topBarEl.offsetHeight : 0;
+        const botH     = botBarEl ? botBarEl.offsetHeight : 0;
+        // Reserve actual control bar space + small safety padding for old Safari viewport quirks.
+        const availH   = Math.max(120, stageH - topH - botH - 24);
+        const availW   = Math.max(160, stageW - 48);
+        let targetH;
+        if (isSingle) {
+            targetH = Math.min(availH, availW / (imgs[0].naturalWidth / imgs[0].naturalHeight));
+        } else {
+            const totalAR = imgs.reduce((s, i) => s + i.naturalWidth / i.naturalHeight, 0);
+            targetH = Math.min(availH, (availW - 3) / totalAR);
+        }
+        return Math.max(1, Math.round(targetH));
+    }
+
+    function applyFitSizes(imgs, isSingle) {
+        if (!imgs.length || !imgs.every(i => i.naturalHeight > 0)) return false;
+        const h = calcFitHeight(imgs, isSingle);
+        imgs.forEach(i => {
+            i.style.height   = h + 'px';
+            i.style.width    = Math.round(h * i.naturalWidth / i.naturalHeight) + 'px';
+            i.style.maxWidth = 'none';
+        });
+        return true;
+    }
+
+    function fitSpread() {
+        if (isZoomed) return;
+        const imgs     = Array.from(spreadEl.querySelectorAll('img'));
+        const isSingle = spreadEl.classList.contains('single');
+        applyFitSizes(imgs, isSingle);
+    }
+
+    async function ensureSpreadReady(index) {
+        const s = spreads[index];
+        if (!s) return;
+        await Promise.all(s.pages.map(url => warmImage(url)));
+    }
+
+    async function showSpread(index) {
+        if (index < 0 || index >= spreads.length) return;
+        const showToken = ++pendingShowToken;
+        await ensureSpreadReady(index);
+        if (showToken !== pendingShowToken) return;
+        spreadEl.style.transition = '';
+        spreadEl.style.transform  = '';
+        applySpread(index);
+        syncPageParam();
+        if (isZoomed) applyZoomLevel(1.0);
+        preloadAhead(index);
+        if (gridBuilt) updateGridHighlight();
+    }
+
+    function updateZoomControls() {
+        zoomSlider.value      = zoomLevel;
+        zoomLabel.textContent = Math.round(zoomLevel * 100) + '%';
+        zoomOutBtn.disabled   = zoomLevel <= 1;
+        zoomInBtn.disabled    = zoomLevel >= 4;
+        fitBtn.disabled       = zoomLevel <= 1;
+    }
+
+    function updateZoomedImageSize() {
+        const imgs = spreadEl.querySelectorAll('img');
+        if (zoomLevel <= 1) {
+            imgs.forEach(img => { img.style.height = ''; img.style.width = ''; img.style.maxWidth = ''; });
+            fitSpread();
+        } else {
+            const h = Math.round(fitHeight * zoomLevel);
+            imgs.forEach(img => { img.style.height = h + 'px'; img.style.width = 'auto'; });
+        }
+    }
+
+    function applyZoomLevel(level, clickEvent) {
+        level = Math.max(1, Math.min(4, level));
+        const wasZoomed = isZoomed;
+        zoomLevel = level;
+        isZoomed  = level > 1;
+        updateZoomControls();
+
+        if (isZoomed) {
+            const sourceClientX = clickEvent ? clickEvent.clientX : (window.innerWidth / 2);
+            const sourceClientY = clickEvent ? clickEvent.clientY : (window.innerHeight / 2);
+            const targetClientX = clickEvent ? (window.innerWidth / 2) : sourceClientX;
+            const targetClientY = clickEvent ? (window.innerHeight / 2) : sourceClientY;
+            const beforeRect = spreadEl.getBoundingClientRect();
+            let relX = 0.5;
+            let relY = 0.5;
+            if (beforeRect.width > 0 && beforeRect.height > 0) {
+                relX = (sourceClientX - beforeRect.left) / beforeRect.width;
+                relY = (sourceClientY - beforeRect.top) / beforeRect.height;
+                relX = Math.max(0, Math.min(1, relX));
+                relY = Math.max(0, Math.min(1, relY));
+            }
+
+            // Capture everything before the layout changes
+            if (!wasZoomed) {
+                const imgs = Array.from(spreadEl.querySelectorAll('img'));
+                fitHeight = imgs.reduce((m, img) => Math.max(m, img.getBoundingClientRect().height), 0)
+                            || (document.getElementById('stage').clientHeight - 80) || (window.innerHeight - 80);
+            }
+
+            document.body.classList.add('scrollable');
+            updateZoomedImageSize();
+
+            const reanchor = () => {
+                const nr = spreadEl.getBoundingClientRect();
+                const dx = nr.left + relX * nr.width  - targetClientX;
+                const dy = nr.top  + relY * nr.height - targetClientY;
+                if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) window.scrollBy(dx, dy);
+            };
+
+            // Two-pass correction: first frame applies new layout, second frame
+            // removes any residual offset so click-zoom lands precisely.
+            requestAnimationFrame(() => {
+                reanchor();
+                requestAnimationFrame(reanchor);
+            });
+        } else {
+            document.body.classList.remove('scrollable');
+            updateZoomedImageSize();
+            window.scrollTo(0, 0);
+        }
+    }
+
+    function setZoom(on, clickEvent) {
+        applyZoomLevel(on ? 2.0 : 1.0, clickEvent);
+    }
+
+    zoomSlider.addEventListener('input', () => applyZoomLevel(parseFloat(zoomSlider.value)));
+    zoomOutBtn.addEventListener('click', () => applyZoomLevel(zoomLevel - 0.25));
+    zoomInBtn.addEventListener('click',  () => applyZoomLevel(zoomLevel + 0.25));
+    fitBtn.addEventListener('click',     () => applyZoomLevel(1.0));
+
+    function prev() { showSpread(currentSpread - 1); }
+    function next() { showSpread(currentSpread + 1); }
+
+    // --- Navigation buttons ---
+    prevBtn.addEventListener('click', prev);
+    nextBtn.addEventListener('click', next);
+    viewModeBtn.addEventListener('click', () => {
+        const firstPage = spreadToFirstPage(currentSpread);
+        viewMode = viewMode === 'spread' ? 'single' : 'spread';
+        spreads = buildSpreads(allPages);
+        gridBuilt = false;
+        updateViewModeButton();
+        showSpread(pageToSpread(firstPage));
+    });
+
+    // --- Edge-hover arrow visibility ---
+    function edgeZoneAtX(clientX) {
+        const rect = spreadEl.getBoundingClientRect();
+        const singlePageVisible = spreadEl.classList.contains('single');
+
+        // Cover/single-page mode: use full outer margins to the window edge.
+        if (singlePageVisible) {
+            if (clientX < rect.left) return 'left';
+            if (clientX > rect.right) return 'right';
+            return null;
+        }
+
+        // Spread mode: allow page turns across the entire outer margins
+        // up to the window edges, while never overlapping the page area.
+        if (clientX < rect.left) return 'left';
+        if (clientX > rect.right) return 'right';
+        return null;
+    }
+
+    document.addEventListener('mousemove', e => {
+        const edge = edgeZoneAtX(e.clientX);
+        const onLeft  = edge === 'left' && !prevBtn.disabled;
+        const onRight = edge === 'right' && !nextBtn.disabled;
+        setClass(prevBtn, 'visible', onLeft);
+        setClass(nextBtn, 'visible', onRight);
+        setClass(prevBtn, 'edge-hot', onLeft);
+        setClass(nextBtn, 'edge-hot', onRight);
+    });
+
+    // Hide arrows when mouse leaves the window
+    document.addEventListener('mouseleave', () => {
+        prevBtn.classList.remove('visible');
+        nextBtn.classList.remove('visible');
+        prevBtn.classList.remove('edge-hot');
+        nextBtn.classList.remove('edge-hot');
+    });
+    document.addEventListener('mouseout', (e) => {
+        if (e.relatedTarget) return;
+        prevBtn.classList.remove('visible');
+        nextBtn.classList.remove('visible');
+        prevBtn.classList.remove('edge-hot');
+        nextBtn.classList.remove('edge-hot');
+    });
+    window.addEventListener('blur', () => {
+        prevBtn.classList.remove('visible');
+        nextBtn.classList.remove('visible');
+        prevBtn.classList.remove('edge-hot');
+        nextBtn.classList.remove('edge-hot');
+    });
+
+    // Edge-zone click navigation: allows page turns anywhere on left/right edge,
+    // not just directly on the arrow buttons.
+    document.addEventListener('click', (e) => {
+        if (hasDragged) return;
+        if (gridOverlay.classList.contains('open')) return;
+        if (isInteractiveTarget(e.target)) return;
+        const edge = edgeZoneAtX(e.clientX);
+        if (edge === 'left' && !prevBtn.disabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            prev();
+        } else if (edge === 'right' && !nextBtn.disabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            next();
+        }
+    }, true);
+
+    // --- Mouse drag (desktop) ---
+    let isDraggingPage = false;
+    let dragDir        = null; // 'next' or 'prev', locked once ghost is shown
+
+    function showGhost(adjacentIndex) {
+        if (adjacentIndex < 0 || adjacentIndex >= spreads.length) return;
+        const s        = spreads[adjacentIndex];
+        const isSingle = s.single;
+        ghostEl.innerHTML = '';
+        ghostEl.className = (isSingle ? 'single ' : '') + 'active';
+        s.pages.forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.draggable = false;
+            if (isZoomed && fitHeight) {
+                img.style.height = Math.round(fitHeight * zoomLevel) + 'px';
+                img.style.width  = 'auto';
+            }
+            ghostEl.appendChild(img);
+        });
+        if (!isZoomed) {
+            const ghostImgs = Array.from(ghostEl.querySelectorAll('img'));
+            const trySize = () => applyFitSizes(ghostImgs, isSingle);
+            if (!trySize()) {
+                let remaining = ghostImgs.filter(i => !i.complete || !i.naturalHeight).length;
+                ghostImgs.forEach(img => {
+                    if (!img.complete || !img.naturalHeight)
+                        img.addEventListener('load', () => { if (--remaining === 0) trySize(); }, { once: true });
+                });
+            }
+        }
+    }
+
+    function cleanupGhost() {
+        ghostEl.className = '';
+        ghostEl.style.transition = '';
+        ghostEl.style.transform  = '';
+        ghostEl.innerHTML = '';
+        dragDir = null;
+    }
+
+    document.addEventListener('mousedown', e => {
+        if (e.button !== 0) return;
+        dragStartX     = e.clientX;
+        lastDragX      = e.clientX;
+        lastDragY      = e.clientY;
+        hasDragged     = false;
+        isPanning      = false;
+        isDraggingPage = false;
+    });
+
+    document.addEventListener('mousemove', e => {
+        if (e.buttons !== 1) return;
+        if (isZoomed) {
+            const dx = lastDragX - e.clientX;
+            const dy = lastDragY - e.clientY;
+            if (!isPanning && (Math.abs(e.clientX - dragStartX) > 6 || Math.abs(e.clientY - lastDragY) > 6)) {
+                isPanning = true;
+                document.body.classList.add('panning');
+                document.body.style.userSelect = 'none';
+            }
+            if (isPanning) {
+                window.scrollBy(dx, dy);
+                hasDragged = true;
+            }
+            lastDragX = e.clientX;
+            lastDragY = e.clientY;
+        } else {
+            const delta = e.clientX - dragStartX;
+            if (Math.abs(delta) > 8) {
+                hasDragged     = true;
+                isDraggingPage = true;
+                // Lock drag direction and populate ghost on first threshold cross
+                if (!dragDir) {
+                    dragDir = delta < 0 ? 'next' : 'prev';
+                    showGhost(currentSpread + (dragDir === 'next' ? 1 : -1));
+                }
+            }
+            if (isDraggingPage) {
+                const ghostOffset = dragDir === 'next' ? window.innerWidth : -window.innerWidth;
+                spreadEl.style.transition = 'none';
+                spreadEl.style.transform  = `translateX(${delta}px)`;
+                ghostEl.style.transition  = 'none';
+                ghostEl.style.transform   = `translateX(${delta + ghostOffset}px)`;
+            }
+        }
+    });
+
+    document.addEventListener('mouseup', e => {
+        if (e.button !== 0) return;
+        if (isPanning) {
+            document.body.classList.remove('panning');
+            document.body.style.userSelect = '';
+            isPanning = false;
+            return;  // hasDragged stays true → click handler ignores the click
+        }
+        if (isDraggingPage) {
+            isDraggingPage = false;
+            const dx          = e.clientX - dragStartX;
+            const goNext      = dragDir === 'next';
+            const targetIndex = currentSpread + (goNext ? 1 : -1);
+            if (Math.abs(dx) > 40 && dragDir && targetIndex >= 0 && targetIndex < spreads.length) {
+                // Ghost slides to center while old spread slides off, then swap
+                const outX = goNext ? -window.innerWidth : window.innerWidth;
+                spreadEl.style.transition = 'transform 0.22s ease';
+                spreadEl.style.transform  = `translateX(${outX}px)`;
+                ghostEl.style.transition  = 'transform 0.22s ease';
+                ghostEl.style.transform   = 'translateX(0)';
+                setTimeout(() => {
+                    applySpread(targetIndex);
+                    if (isZoomed) updateZoomedImageSize();
+                    spreadEl.style.transition = 'none';
+                    spreadEl.style.transform  = 'translateX(0)';
+                    cleanupGhost();
+                    preloadAhead(targetIndex);
+                }, 225);
+            } else {
+                // Snap both back
+                spreadEl.style.transition = 'transform 0.25s ease';
+                spreadEl.style.transform  = 'translateX(0)';
+                cleanupGhost();
+            }
+            return;  // hasDragged stays true → click handler ignores the click
+        }
+        hasDragged = false;
+    });
+
+    // Click to zoom (only when not a drag)
+    spreadEl.addEventListener('click', e => {
+        const dragged = hasDragged;
+        hasDragged = false;
+        if (!dragged) setZoom(!isZoomed, e);
+    });
+
+    // --- Touch (mobile) ---
+    let touchMoved = false;
+    spreadEl.addEventListener('touchstart', e => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        touchMoved  = false;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', () => { touchMoved = true; }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+        if (isZoomed) return;  // native scroll handles panning when zoomed
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) next(); else prev();
+        }
+    });
+
+    // --- Page jump (click indicator) ---
+    function commitPageInput() {
+        const p = parseInt(pageInput.value, 10);
+        pageInput.style.display = 'none';
+        pageLabel.style.display = '';
+        if (!isNaN(p) && p >= 1 && p <= totalPages) showSpread(pageToSpread(p));
+    }
+
+    pageIndicator.addEventListener('click', () => {
+        if (pageInput.style.display === 'block') return;
+        const firstPage = spreadToFirstPage(currentSpread);
+        pageInput.value = firstPage;
+        pageInput.max   = totalPages;
+        pageLabel.style.display = 'none';
+        pageInput.style.display = 'block';
+        pageInput.focus();
+        pageInput.select();
+    });
+
+    pageInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); commitPageInput(); }
+        if (e.key === 'Escape') { e.preventDefault(); pageInput.style.display = 'none'; pageLabel.style.display = ''; }
+    });
+    pageInput.addEventListener('blur', commitPageInput);
+
+    // --- Grid view ---
+    function thumbUrl(url) {
+        const slash = url.lastIndexOf('/');
+        return url.slice(0, slash) + '/thumbnails' + url.slice(slash);
+    }
+
+    let gridBuilt = false;
+    let taggingMode = false;
+    let pageTagMap = new Map();
+    let knownTags = ['ad_fullpage'];
+
+    if (!canTagPages && tagBar) {
+        tagBar.style.display = 'none';
+    }
+
+    function adminApiUrl(path) {
+        return `${adminApiBase}${path}`;
+    }
+
+    function selectedTag() {
+        const typed = tagInput.value.trim();
+        return typed || tagSelect.value || 'ad_fullpage';
+    }
+
+    function setTagStatus(text, isError = false) {
+        tagStatus.textContent = text || '';
+        tagStatus.style.color = isError ? '#ff8b8b' : '#999';
+    }
+
+    function setKnownTags(tags) {
+        const merged = Array.from(new Set(['ad_fullpage', ...knownTags, ...(tags || [])])).sort();
+        knownTags = merged;
+        const current = tagSelect.value || 'ad_fullpage';
+        tagSelect.innerHTML = '';
+        merged.forEach(tag => {
+            const opt = document.createElement('option');
+            opt.value = tag;
+            opt.textContent = tag;
+            tagSelect.appendChild(opt);
+        });
+        tagSelect.value = merged.includes(current) ? current : 'ad_fullpage';
+    }
+
+    async function loadPageTags() {
+        if (!canTagPages) {
+            pageTagMap = new Map();
+            return;
+        }
+        try {
+            const url = `${adminApiUrl('/api/page-tags')}?mag=${encodeURIComponent(mag)}&year=${encodeURIComponent(year)}&issue=${encodeURIComponent(issue)}`;
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(String(resp.status));
+            const data = await resp.json();
+            pageTagMap = new Map((data.pages || []).map(p => [Number(p.page), p.page_tags || []]));
+            setKnownTags(data.existing_tags || []);
+            setTagStatus('Tagging ready');
+        } catch (err) {
+            pageTagMap = new Map();
+            setTagStatus('Tag API unavailable', true);
+        }
+    }
+
+    function renderThumbTags(item, pageNum) {
+        item.querySelector('.thumb-tags')?.remove();
+        const tags = pageTagMap.get(pageNum) || [];
+        if (!tags.length) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'thumb-tags';
+        tags.forEach(tag => {
+            const el = document.createElement('span');
+            el.className = 'thumb-tag';
+            el.textContent = tag;
+            wrap.appendChild(el);
+        });
+        item.appendChild(wrap);
+    }
+
+    async function savePageTags(pageNum, tags) {
+        if (!canTagPages) throw new Error('Tagging disabled');
+        const resp = await fetch(adminApiUrl('/api/page-tags'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mag,
+                year,
+                issue,
+                page: pageNum,
+                page_tags: tags,
+            }),
+        });
+        if (!resp.ok) throw new Error(String(resp.status));
+        return resp.json();
+    }
+
+    async function togglePageTag(pageNum, item) {
+        const tag = selectedTag();
+        if (!tag) {
+            setTagStatus('Select or type a tag', true);
+            return;
+        }
+        const tags = [...(pageTagMap.get(pageNum) || [])];
+        const nextTags = tags.includes(tag)
+            ? tags.filter(t => t !== tag)
+            : [...tags, tag];
+        try {
+            setTagStatus(`Saving p.${pageNum}...`);
+            await savePageTags(pageNum, nextTags);
+            pageTagMap.set(pageNum, nextTags);
+            setKnownTags([...knownTags, tag]);
+            renderThumbTags(item, pageNum);
+            setTagStatus(nextTags.includes(tag) ? `Tagged p.${pageNum} as ${tag}` : `Removed ${tag} from p.${pageNum}`);
+        } catch (err) {
+            setTagStatus(`Save failed on p.${pageNum}`, true);
+        }
+    }
+
+    function updateTagModeUi() {
+        if (!canTagPages) return;
+        setClass(tagModeBtn, 'active', taggingMode);
+        gridInner.querySelectorAll('.thumb-item').forEach(el => setClass(el, 'tagging-mode', taggingMode));
+        if (taggingMode) {
+            setTagStatus(`Click a page to toggle "${selectedTag()}"`);
+        } else if (!tagStatus.textContent || tagStatus.textContent.startsWith('Click a page')) {
+            setTagStatus('Tagging ready');
+        }
+    }
+
+    function buildGrid() {
+        document.getElementById('gridTitle').textContent =
+            t('grid_title', {mag: magName, year, n: parseInt(issue, 10), total: totalPages});
+        gridInner.innerHTML = '';
+        let pageNum = 0;
+        spreads.forEach((spread, spreadIdx) => {
+            spread.pages.forEach(url => {
+                pageNum++;
+                const thumbPageNum = pageNum;
+                const item = document.createElement('div');
+                item.className = 'thumb-item';
+                item.dataset.spreadIdx = spreadIdx;
+                item.dataset.pageNum = thumbPageNum;
+
+                const img = document.createElement('img');
+                img.src       = thumbUrl(url);
+                img.loading   = 'lazy';
+                img.draggable = false;
+                img.alt       = thumbPageNum === 1 ? t('cover_label') : t('page_label', {n: thumbPageNum});
+
+                const num = document.createElement('div');
+                num.className   = 'thumb-num';
+                num.textContent = thumbPageNum === 1 ? t('cover_label') : thumbPageNum;
+
+                item.appendChild(img);
+                item.appendChild(num);
+                renderThumbTags(item, thumbPageNum);
+                item.addEventListener('click', async () => {
+                    if (taggingMode) {
+                        await togglePageTag(thumbPageNum, item);
+                        return;
+                    }
+                    showSpread(spreadIdx);
+                    closeGrid();
+                });
+                gridInner.appendChild(item);
+            });
+        });
+        gridBuilt = true;
+        updateTagModeUi();
+    }
+
+    function updateGridHighlight() {
+        gridInner.querySelectorAll('.thumb-item').forEach(el => {
+            setClass(el, 'active-spread', parseInt(el.dataset.spreadIdx) === currentSpread);
+        });
+    }
+
+    function openGrid() {
+        if (!gridBuilt) buildGrid();
+        updateGridHighlight();
+        if (canTagPages && startTaggingOnLoad) {
+            taggingMode = true;
+            updateTagModeUi();
+        }
+        gridOverlay.classList.add('open');
+        const active = gridInner.querySelector('.active-spread');
+        if (active) requestAnimationFrame(() => safeScrollIntoViewCenter(active));
+    }
+
+    function closeGrid() { gridOverlay.classList.remove('open'); }
+
+    gridBtn.addEventListener('click', openGrid);
+    gridCloseBtn.addEventListener('click', closeGrid);
+    gridOverlay.addEventListener('click', e => { if (e.target === gridOverlay) closeGrid(); });
+    if (canTagPages) {
+        tagModeBtn.addEventListener('click', () => {
+            taggingMode = !taggingMode;
+            updateTagModeUi();
+        });
+        tagSelect.addEventListener('change', () => { if (taggingMode) updateTagModeUi(); });
+        tagInput.addEventListener('input', () => { if (taggingMode) updateTagModeUi(); });
+    }
+
+    // --- Keyboard ---
+    document.addEventListener('keydown', e => {
+        if (gridOverlay.classList.contains('open')) {
+            if (e.key === 'Escape') closeGrid();
+            return;
+        }
+        if (pageInput.style.display === 'block') return;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+            e.preventDefault();
+            prev();
+        } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+            e.preventDefault();
+            next();
+        } else if (e.key === 'Escape') {
+            applyZoomLevel(1.0);
+        }
+    });
+
+    // --- Mouse wheel (page turn when not zoomed) ---
+    document.addEventListener('wheel', e => {
+        if (gridOverlay.classList.contains('open')) return;
+        if (isZoomed) return;
+        e.preventDefault();
+        if (e.deltaY > 0 || e.deltaX > 0) next(); else prev();
+    }, { passive: false });
+
+    window.addEventListener('resize', () => { if (!isZoomed) fitSpread(); });
+
+    // --- Init ---
+    (async () => {
+        await loadPageTags();
+        loadingText.textContent = t('loading_issue', {mag: magName, year, n: parseInt(issue, 10)});
+        allPages = await discoverPages();
+        if (!allPages.length) {
+            loadingText.textContent = t('no_pages');
+            loadingFill.parentElement.style.display = 'none';
+            return;
+        }
+        spreads    = buildSpreads(allPages);
+        totalPages = allPages.length;
+        loadingEl.style.display = 'none';
+        updateViewModeButton();
+        applyLang();
+        const initialPage = Number.isFinite(requestedPageNum) ? requestedPageNum : 1;
+        const clampedPage = Math.max(1, Math.min(totalPages, initialPage));
+        showSpread(pageToSpread(clampedPage));
+        if (openGridOnLoad) {
+            requestAnimationFrame(() => openGrid());
+        }
+    })();
+
+    function applyLang() {
+        const lang  = Lang.getLang();
+        const other = lang === 'en' ? 'EN' : 'FI';
+        const langBtn = document.getElementById('langBtn');
+        if (langBtn) { langBtn.textContent = other; langBtn.title = other; }
+        const backBtnLabel = document.getElementById('backBtnLabel');
+        if (backBtnLabel) backBtnLabel.textContent = t('back');
+        zoomOutBtn.title  = t('zoom_out');
+        zoomInBtn.title   = t('zoom_in');
+        fitBtn.title      = t('fit_page');
+        gridBtn.title     = t('page_grid');
+        pageIndicator.title = t('click_to_jump');
+        updateViewModeButton();
+        // Update issue title
+        document.getElementById('issueTitle').textContent =
+            t('issue_title_desktop', {mag: magName, year, n: parseInt(issue, 10)});
+        // Re-render page label if spreads are loaded
+        if (spreads.length) {
+            pageLabel.textContent = spreadLabel(currentSpread);
+            if (gridBuilt) buildGrid();
+        }
+    }
+
+    document.getElementById('langBtn').addEventListener('click', () => {
+        Lang.setLang(Lang.getLang() === 'en' ? 'fi' : 'en');
+        applyLang();
+    });
+</script>
+</body>
+</html>

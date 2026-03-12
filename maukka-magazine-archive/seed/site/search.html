@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search — Magazines</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #111;
+    color: #ddd;
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  header a {
+    color: #888;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  header a:hover { color: #ccc; }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    max-width: 640px;
+  }
+
+  #query {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 16px;
+    background: #222;
+    color: #fff;
+    border: 1px solid #444;
+    border-radius: 8px;
+    outline: none;
+  }
+  #query:focus { border-color: #888; }
+
+  button {
+    padding: 10px 20px;
+    font-size: 15px;
+    background: #3a7bd5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:active { background: #2d62b0; }
+
+  #status {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+    min-height: 18px;
+  }
+
+  .result {
+    background: #1c1c1c;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    max-width: 640px;
+  }
+
+  /* Review results get a distinct left border */
+  .result.review-result {
+    border-left: 3px solid #e94560;
+  }
+
+  .result-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .result-game {
+    font-weight: 700;
+    color: #fff;
+    font-size: 16px;
+  }
+
+  .result-mag {
+    font-weight: 600;
+    color: #fff;
+    font-size: 15px;
+  }
+
+  .result-issue {
+    color: #aaa;
+    font-size: 13px;
+  }
+
+  .result-page {
+    color: #888;
+    font-size: 13px;
+  }
+
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  .badge-review   { background: #e9456022; color: #e94560; border: 1px solid #e9456055; }
+  .badge-preview  { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b55; }
+  .badge-walkthrough { background: #10b98122; color: #10b981; border: 1px solid #10b98155; }
+
+  .result-score {
+    font-size: 13px;
+    color: #e94560;
+    font-weight: 600;
+  }
+
+  .result-reviewers {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  .result-snippet {
+    font-size: 13px;
+    color: #999;
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .result-snippet mark {
+    background: #3a7bd540;
+    color: #6ab0ff;
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+
+  .result-links {
+    display: flex;
+    gap: 10px;
+  }
+
+  .result-links a {
+    font-size: 13px;
+    color: #3a7bd5;
+    text-decoration: none;
+    padding: 4px 10px;
+    border: 1px solid #3a7bd550;
+    border-radius: 6px;
+  }
+  .result-links a:hover { background: #3a7bd520; }
+
+  .section-heading {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #555;
+    max-width: 640px;
+    margin-bottom: 10px;
+    margin-top: 4px;
+  }
+
+  .no-results {
+    color: #666;
+    font-size: 14px;
+    max-width: 640px;
+  }
+
+  .lang-toggle {
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.4);
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .lang-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="carousel.html" id="backLink">&#8592; <span id="backLabel"></span></a>
+  <h1 id="searchHeading"></h1>
+  <button class="lang-toggle" id="langBtn" style="margin-left:auto"></button>
+</header>
+
+<div class="search-row">
+  <input id="query" type="search" placeholder="" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <button id="searchSubmitBtn" onclick="doSearch()"></button>
+</div>
+
+<div id="status"></div>
+<div id="results"></div>
+
+<script src="lang.js"></script>
+<script>
+const t = Lang.t.bind(Lang);
+let indexData = null;
+let lastQuery = null;
+let indexLoadingPromise = null;
+let searchApiAvailable = null;
+let backendDetectPromise = null;
+
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      value => { clearTimeout(timer); resolve(value); },
+      err => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
+function applyLang() {
+  const lang  = Lang.getLang();
+  const other = lang === 'en' ? 'EN' : 'FI';
+  const langBtn = document.getElementById('langBtn');
+  if (langBtn) { langBtn.textContent = other; langBtn.title = other; }
+  document.getElementById('backLabel').textContent = t('back');
+  document.getElementById('searchHeading').textContent = t('search_heading');
+  document.getElementById('query').placeholder = t('search_placeholder');
+  document.getElementById('searchSubmitBtn').textContent = t('search_button');
+  // Re-run search if one was already performed (restore query value in case it was cleared)
+  if (lastQuery) {
+    const qEl = document.getElementById('query');
+    if (!qEl.value.trim()) qEl.value = lastQuery;
+    doSearch();
+  }
+}
+
+document.getElementById('langBtn').addEventListener('click', () => {
+  Lang.setLang(Lang.getLang() === 'en' ? 'fi' : 'en');
+  applyLang();
+});
+
+async function loadIndex() {
+  if (indexData) return true;
+  if (indexLoadingPromise) return indexLoadingPromise;
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = 'Loading search index…';
+  indexLoadingPromise = (async () => {
+  try {
+    const r = await fetch('search_index.json');
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    const pages = Array.isArray(data) ? data : (data.pages || []);
+    const reviews = Array.isArray(data) ? [] : (data.reviews || []);
+    for (const entry of pages) {
+      entry._searchDirect = (entry.text || '').toLowerCase();
+      entry._searchNormalized = searchTokens(entry.text).join(' ');
+      entry._searchCompact = entry._searchNormalized.replace(/\s+/g, '');
+    }
+    for (const entry of reviews) {
+      entry._searchDirect = (entry.game || '').toLowerCase();
+      entry._searchNormalized = searchTokens(entry.game).join(' ');
+      entry._searchCompact = entry._searchNormalized.replace(/\s+/g, '');
+    }
+    indexData = {
+      pages,
+      reviews,
+    };
+    return true;
+  } catch (e) {
+    document.getElementById('status').textContent = t('index_not_found');
+    return false;
+  }
+  })();
+  const ok = await indexLoadingPromise;
+  indexLoadingPromise = null;
+  if (ok && !lastQuery && !document.getElementById('query').value.trim()) {
+    statusEl.textContent = 'Search ready';
+  }
+  return ok;
+}
+
+async function detectSearchBackend() {
+  if (searchApiAvailable !== null) return searchApiAvailable;
+  if (backendDetectPromise) return backendDetectPromise;
+  backendDetectPromise = (async () => {
+    try {
+      const resp = await withTimeout(fetch('/api/health', { cache: 'no-store' }), 1200);
+      searchApiAvailable = resp.ok;
+    } catch (e) {
+      searchApiAvailable = false;
+    }
+    backendDetectPromise = null;
+    return searchApiAvailable;
+  })();
+  return backendDetectPromise;
+}
+
+function snippet(text, query, radius = 120) {
+  const lo = text.toLowerCase();
+  const ql = query.toLowerCase();
+  const pos = lo.indexOf(ql);
+  if (pos === -1) return escHtml(text.slice(0, radius * 2)) + '…';
+  const start = Math.max(0, pos - radius);
+  const end   = Math.min(text.length, pos + query.length + radius);
+  const chunk = (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '');
+  return chunk.replace(new RegExp(escapeRe(query), 'gi'), m => `<mark>${escHtml(m)}</mark>`);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escapeRe(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const SEARCH_STOPWORDS = new Set(['a', 'an', 'and', 'the', 'of']);
+
+function normalizeSearchText(s) {
+  return (s || '')
+    .replace(/([\p{Ll}\d])([\p{Lu}])/gu, '$1 $2')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function searchTokens(s) {
+  return normalizeSearchText(s)
+    .split(/\s+/)
+    .filter(token => token && !SEARCH_STOPWORDS.has(token));
+}
+
+function matchesSearch(entry, searchQuery) {
+  if (entry._searchDirect.includes(searchQuery.direct)) return true;
+
+  const queryTokens = searchQuery.tokens;
+  if (!queryTokens.length) return false;
+
+  const normalizedText = entry._searchNormalized || '';
+  const compactText = entry._searchCompact || '';
+  const textTokens = normalizedText ? normalizedText.split(' ') : [];
+  const normalizedQuery = searchQuery.normalized;
+  const compactQuery = searchQuery.compact;
+  if (normalizedText.includes(normalizedQuery)) return true;
+  if (compactQuery && compactText.includes(compactQuery)) return true;
+
+  let pos = 0;
+  for (const token of queryTokens) {
+    pos = textTokens.indexOf(token, pos);
+    if (pos === -1) return false;
+    pos += 1;
+  }
+  return true;
+}
+
+function isMobile() {
+  return window.innerWidth < 768;
+}
+
+function viewerUrl(entry, mobile) {
+  const base = mobile ? 'mobile_viewer.html' : 'viewer.html';
+  return `${base}?mag=${encodeURIComponent(entry.mag)}&year=${entry.year}&issue=${entry.issue}&page=${entry.page}&ref=search`;
+}
+
+function deriveScore(entry) {
+  if (entry.score != null) return { value: entry.score, scale: entry.score_scale ?? 100 };
+  if (entry.yleisarvosana != null) return { value: entry.yleisarvosana, scale: entry.score_scale ?? 5 };
+
+  const parts = [entry.toteutus, entry.pelattavuus, entry.kiinnostavuus]
+    .filter(v => typeof v === 'number');
+  if (!parts.length) return null;
+
+  const avg = parts.reduce((sum, v) => sum + v, 0) / parts.length;
+  const value = Number.isInteger(avg) ? String(avg) : avg.toFixed(1);
+  return { value, scale: 5 };
+}
+
+function renderReviewResult(e, mobile) {
+  const magDisplay  = e.mag.replace(/_/g, ' ');
+  const issueNum    = parseInt(e.issue, 10);
+  const badgeClass  = e.type === 'review' ? 'badge-review' : e.type === 'preview' ? 'badge-preview' : 'badge-walkthrough';
+  const badgeLabel  = e.type === 'review' ? t('badge_review') : e.type === 'preview' ? t('badge_preview') : t('badge_walkthrough');
+  const derivedScore = deriveScore(e);
+  const scoreHtml   = derivedScore ? `<span class="result-score">${derivedScore.value}/${derivedScore.scale}</span>` : '';
+  const reviewersHtml = e.reviewers?.length
+    ? `<div class="result-reviewers">${e.reviewers.join(', ')}</div>` : '';
+  const pageHtml = e.page ? `<span class="result-page">${t('page_number_prefix')} ${e.page}</span>` : '';
+  return `
+    <div class="result review-result">
+      <div class="result-meta">
+        <span class="result-game">${escHtml(e.game)}</span>
+        <span class="badge ${badgeClass}">${badgeLabel}</span>
+        ${scoreHtml}
+      </div>
+      <div class="result-meta">
+        <span class="result-mag">${escHtml(magDisplay)}</span>
+        <span class="result-issue">${issueNum}/${e.year}</span>
+        ${pageHtml}
+      </div>
+      ${reviewersHtml}
+      <div class="result-links">
+        ${e.page ? `<a href="${viewerUrl(e, mobile)}">${t('open_in_reader')}</a>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderPageResult(e, raw, mobile) {
+  const magDisplay = e.mag.replace(/_/g, ' ');
+  const issueNum   = parseInt(e.issue, 10);
+  return `
+    <div class="result">
+      <div class="result-meta">
+        <span class="result-mag">${escHtml(magDisplay)}</span>
+        <span class="result-issue">${issueNum}/${e.year}</span>
+        <span class="result-page">${t('page_number_prefix')} ${e.page}</span>
+      </div>
+      <div class="result-snippet">${snippet(e.text, raw)}</div>
+      <div class="result-links">
+        <a href="${viewerUrl(e, mobile)}">${t('open_in_reader')}</a>
+      </div>
+    </div>`;
+}
+
+function renderResults(reviewHits, pageHits, raw) {
+  const statusEl = document.getElementById('status');
+  const resultsEl = document.getElementById('results');
+  const total = reviewHits.length + pageHits.length;
+
+  if (!total) {
+    statusEl.textContent = t('no_results_status', {query: raw});
+    resultsEl.innerHTML = `<p class="no-results">${t('no_results_tip')}</p>`;
+    return;
+  }
+
+  statusEl.textContent = total === 1
+    ? t('results_count', {n: total, query: raw})
+    : t('results_count_plural', {n: total, query: raw});
+
+  const mobile = isMobile();
+  const parts = [];
+
+  if (reviewHits.length) {
+    const rHead = reviewHits.length === 1
+      ? t('reviews_heading', {n: reviewHits.length})
+      : t('reviews_heading_plural', {n: reviewHits.length});
+    parts.push(`<div class="section-heading">${escHtml(rHead)}</div>`);
+    parts.push(...reviewHits.map(e => renderReviewResult(e, mobile)));
+  }
+
+  if (pageHits.length) {
+    const cHead = pageHits.length === 1
+      ? t('content_heading', {n: pageHits.length})
+      : t('content_heading_plural', {n: pageHits.length});
+    if (reviewHits.length) {
+      parts.push(`<div class="section-heading" style="margin-top:24px">${escHtml(cHead)}</div>`);
+    } else {
+      parts.push(`<div class="section-heading">${escHtml(cHead)}</div>`);
+    }
+    parts.push(...pageHits.map(e => renderPageResult(e, raw, mobile)));
+  }
+
+  resultsEl.innerHTML = parts.join('');
+}
+
+async function apiSearch(raw) {
+  const resp = await fetch(`/api/search?q=${encodeURIComponent(raw)}&limit=200`, {
+    cache: 'no-store',
+  });
+  if (!resp.ok) {
+    throw new Error(`api ${resp.status}`);
+  }
+  return resp.json();
+}
+
+async function doSearch() {
+  const raw = document.getElementById('query').value.trim();
+  const statusEl  = document.getElementById('status');
+  const resultsEl = document.getElementById('results');
+
+  if (!raw) return;
+
+  lastQuery = raw;
+  statusEl.textContent = t('loading_search');
+  resultsEl.innerHTML = '';
+  if (await detectSearchBackend()) {
+    try {
+      const data = await apiSearch(raw);
+      renderResults(data.reviews || [], data.pages || [], raw);
+      return;
+    } catch (e) {
+      searchApiAvailable = false;
+    }
+  }
+
+  if (!await loadIndex()) return;
+
+  const queryTokens = searchTokens(raw);
+  const searchQuery = {
+    direct: raw.toLowerCase(),
+    tokens: queryTokens,
+    normalized: queryTokens.join(' '),
+    compact: queryTokens.join(''),
+  };
+  const reviewHits = indexData.reviews.filter(e => matchesSearch(e, searchQuery));
+  const pageHits = indexData.pages.filter(e =>
+    !e.page_tags?.includes('ad_only') &&
+    !e.page_tags?.includes('ad_fullpage') &&
+    matchesSearch(e, searchQuery)
+  );
+  renderResults(reviewHits, pageHits, raw);
+}
+
+document.getElementById('query').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+document.getElementById('backLink').addEventListener('click', e => {
+  if (document.referrer) {
+    e.preventDefault();
+    history.back();
+  }
+  // else: follow the href fallback to carousel.html
+});
+
+// Detect backend in background and only fall back to client-side index if needed.
+detectSearchBackend().then(ok => {
+  const statusEl = document.getElementById('status');
+  if (ok && !lastQuery && !document.getElementById('query').value.trim()) {
+    statusEl.textContent = 'Search ready';
+    return;
+  }
+  loadIndex();
+});
+applyLang();
+document.getElementById('query').focus();
+</script>
+</body>
+</html>

@@ -1,9 +1,17 @@
 services:
+  init:
+    build:
+      context: ./init
+    restart: "no"
+    volumes:
+      - ${APP_DATA_DIR}/site:/data
+
   viewer:
     build:
       context: ./viewer
     restart: unless-stopped
     depends_on:
+      - init
       - search
     ports:
       - "8088:80"
@@ -14,6 +22,8 @@ services:
     build:
       context: ./search
     restart: unless-stopped
+    depends_on:
+      - init
     working_dir: /app
     environment:
       SEARCH_HOST: 0.0.0.0
