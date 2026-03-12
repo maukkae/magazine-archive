@@ -9,7 +9,7 @@ services:
     image: ghcr.io/maukkae/magazine-archive-init:latest
     restart: "no"
     volumes:
-      - ${APP_DATA_DIR}/site:/data
+      - ${APP_DATA_DIR}:/data
 
   viewer:
     image: ghcr.io/maukkae/magazine-archive-viewer:latest
@@ -18,7 +18,7 @@ services:
       - init
       - search
     volumes:
-      - ${APP_DATA_DIR}/site:/usr/share/nginx/html:ro
+      - ${APP_DATA_DIR}:/usr/share/nginx/html:ro
 
   search:
     image: ghcr.io/maukkae/magazine-archive-search:latest
@@ -29,10 +29,10 @@ services:
     environment:
       SEARCH_HOST: 0.0.0.0
       SEARCH_PORT: 8002
-      SEARCH_DB: /data/search.db
-      SEARCH_STATIC_ROOT: /data
+      SEARCH_DB: /data/site/search.db
+      SEARCH_STATIC_ROOT: /data/site
     volumes:
-      - ${APP_DATA_DIR}/site:/data:rw
+      - ${APP_DATA_DIR}:/data:rw
 
   # Optional future service if you want in-app extraction/import support.
   # extractor:
