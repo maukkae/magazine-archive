@@ -3,9 +3,9 @@
 For the future Umbrel app listing, prepare:
 
 - `icon.svg` or `icon.png`
-- `1.png`
-- `2.png`
-- `3.png`
+- `gallery/1.png`
+- `gallery/2.png`
+- `gallery/3.png`
 
 Suggested screenshots:
 

@@ -1,24 +1,32 @@
 manifestVersion: 1
 id: maukka-magazine-archive
-category: media
 name: Magazine Archive
+tagline: Browse and search a self-hosted magazine collection
+icon: ./icon.svg
+category: media
 version: "0.1.0"
-tagline: Self-hosted searchable archive for game and magazine collections
+port: 8088
 description: >-
-  Browse, read, and search a self-hosted magazine archive with cover browsing,
-  full-page viewer support, and fast full-text search.
+  Magazine Archive is a self-hosted viewer for retro and modern magazine
+  collections. It supports cover browsing, spread reading, mobile access, and
+  fast SQLite-backed full-text search.
 
-  This draft manifest is a local planning file and is not the final published
-  Umbrel app package yet.
-releaseNotes: ""
-developer: Maukka
-website: ""
+  This repository is currently a packaging draft for a future Umbrel community
+  app release.
+developer: maukkae
+website: https://github.com/maukkae/magazine-archive
+submitter: maukkae
+submission: https://github.com/maukkae/magazine-archive
+repo: https://github.com/maukkae/magazine-archive
+support: https://github.com/maukkae/magazine-archive/issues
+gallery:
+  - ./gallery/1.png
+  - ./gallery/2.png
+  - ./gallery/3.png
+releaseNotes: >-
+  Initial packaging draft. Viewer, search API, and static-site container layout
+  have been prepared for a future Umbrel community app release.
 dependencies: []
-repo: ""
-support: ""
-gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-submitter: Maukka
-submission: ""

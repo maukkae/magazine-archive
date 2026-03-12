@@ -1,12 +1,32 @@
 services:
   viewer:
-    image: nginx:alpine
+    build:
+      context: ./viewer
     restart: unless-stopped
-    # Draft only. Final Umbrel app version should mount packaged static files
-    # and proxy /api/ to the search service by service name.
+    depends_on:
+      - search
+    ports:
+      - "8088:80"
+    volumes:
+      - ${APP_DATA_DIR}/site:/usr/share/nginx/html:ro
 
   search:
-    image: python:3.13-slim
+    build:
+      context: ./search
     restart: unless-stopped
-    # Draft only. Final Umbrel app version should copy search_server.py and
-    # search_store.py into the image and mount the search database as app data.
+    working_dir: /app
+    environment:
+      SEARCH_HOST: 0.0.0.0
+      SEARCH_PORT: 8002
+      SEARCH_DB: /data/search.db
+      SEARCH_STATIC_ROOT: /data
+    volumes:
+      - ${APP_DATA_DIR}/site:/data:rw
+
+  # Optional future service if you want in-app extraction/import support.
+  # extractor:
+  #   build:
+  #     context: ./extractor
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ${APP_DATA_DIR}/site:/work
