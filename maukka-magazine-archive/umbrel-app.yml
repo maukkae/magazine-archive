@@ -5,7 +5,7 @@ tagline: Browse and search a self-hosted magazine collection
 icon: ./icon.svg
 category: media
 version: "0.1.0"
-port: 8088
+port: 8098
 description: >-
   Magazine Archive is a self-hosted viewer for retro and modern magazine
   collections. It supports cover browsing, spread reading, mobile access, and
