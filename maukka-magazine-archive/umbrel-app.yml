@@ -2,7 +2,7 @@ manifestVersion: 1
 id: maukka-magazine-archive
 name: Magazine Archive
 tagline: Browse and search a self-hosted magazine collection
-icon: https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/1.png
+icon: https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/icon.png
 category: media
 version: "0.1.0"
 port: 8098
