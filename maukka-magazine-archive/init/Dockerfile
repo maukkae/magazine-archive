@@ -3,7 +3,7 @@ FROM alpine:3.22
 WORKDIR /seed
 
 COPY seed/ /seed/
-COPY init.sh /init.sh
+COPY init/init.sh /init.sh
 
 RUN chmod +x /init.sh
 
