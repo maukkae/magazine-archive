@@ -1,0 +1,24 @@
+manifestVersion: 1
+id: maukka-magazine-archive
+category: media
+name: Magazine Archive
+version: "0.1.0"
+tagline: Self-hosted searchable archive for game and magazine collections
+description: >-
+  Browse, read, and search a self-hosted magazine archive with cover browsing,
+  full-page viewer support, and fast full-text search.
+
+  This draft manifest is a local planning file and is not the final published
+  Umbrel app package yet.
+releaseNotes: ""
+developer: Maukka
+website: ""
+dependencies: []
+repo: ""
+support: ""
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: Maukka
+submission: ""

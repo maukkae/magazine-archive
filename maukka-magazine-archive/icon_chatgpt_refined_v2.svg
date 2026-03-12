@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="110" fill="#101827"/>
+
+  <rect x="70" y="110" width="190" height="300" rx="20" fill="#22324A"/>
+  <rect x="252" y="110" width="190" height="300" rx="20" fill="#22324A"/>
+  <rect x="242" y="110" width="20" height="300" rx="10" fill="#3B506F"/>
+
+  <rect x="105" y="172" width="126" height="14" rx="7" fill="#9DB2CE"/>
+  <rect x="105" y="206" width="108" height="14" rx="7" fill="#9DB2CE"/>
+  <rect x="105" y="240" width="120" height="14" rx="7" fill="#9DB2CE"/>
+  <rect x="105" y="274" width="84" height="14" rx="7" fill="#9DB2CE"/>
+
+  <rect x="287" y="172" width="126" height="14" rx="7" fill="#9DB2CE"/>
+  <rect x="287" y="206" width="108" height="14" rx="7" fill="#9DB2CE"/>
+  <rect x="287" y="240" width="120" height="14" rx="7" fill="#9DB2CE"/>
+  <rect x="287" y="274" width="84" height="14" rx="7" fill="#9DB2CE"/>
+
+  <polygon
+    points="410,92 421,122 453,122 427,141 437,172 410,153 383,172 393,141 367,122 399,122"
+    fill="#FF4D5A"/>
+</svg>

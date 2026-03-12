@@ -1,0 +1,12 @@
+services:
+  viewer:
+    image: nginx:alpine
+    restart: unless-stopped
+    # Draft only. Final Umbrel app version should mount packaged static files
+    # and proxy /api/ to the search service by service name.
+
+  search:
+    image: python:3.13-slim
+    restart: unless-stopped
+    # Draft only. Final Umbrel app version should copy search_server.py and
+    # search_store.py into the image and mount the search database as app data.
