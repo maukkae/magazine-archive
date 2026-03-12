@@ -6,15 +6,13 @@ services:
       PROXY_AUTH_ADD: "false"
 
   init:
-    build:
-      context: ./init
+    image: ghcr.io/maukkae/magazine-archive-init:latest
     restart: "no"
     volumes:
       - ${APP_DATA_DIR}/site:/data
 
   viewer:
-    build:
-      context: ./viewer
+    image: ghcr.io/maukkae/magazine-archive-viewer:latest
     restart: unless-stopped
     depends_on:
       - init
@@ -23,8 +21,7 @@ services:
       - ${APP_DATA_DIR}/site:/usr/share/nginx/html:ro
 
   search:
-    build:
-      context: ./search
+    image: ghcr.io/maukkae/magazine-archive-search:latest
     restart: unless-stopped
     depends_on:
       - init

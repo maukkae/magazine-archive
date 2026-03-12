@@ -23,6 +23,8 @@ Bundled seed data:
 
 No real magazine JPG/PDF content is bundled in the app draft.
 
+Registry-backed container images are required for actual Umbrel installation.
+
 Recommended icon concept:
 
 - stylized open magazine spread

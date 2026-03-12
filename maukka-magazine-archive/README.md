@@ -30,6 +30,15 @@ content. The expected future flow is:
 The current draft also disables Umbrel proxy auth so the viewer can stay open
 on the local network without an extra login prompt.
 
+Container images expected by this draft:
+
+- `ghcr.io/maukkae/magazine-archive-init:latest`
+- `ghcr.io/maukkae/magazine-archive-viewer:latest`
+- `ghcr.io/maukkae/magazine-archive-search:latest`
+
+Those images do not exist yet. The next packaging step is to build and publish
+them so Umbrel can install the app without local `build:` contexts.
+
 This package is not yet the final production Umbrel app. It is a staging point
 for converting the current working local/Umbrel deployment into a clean
 community app-store package.
