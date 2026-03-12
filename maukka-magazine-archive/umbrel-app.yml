@@ -20,9 +20,9 @@ submission: https://github.com/maukkae/magazine-archive
 repo: https://github.com/maukkae/magazine-archive
 support: https://github.com/maukkae/magazine-archive/issues
 gallery:
-  - ./gallery/1.png
-  - ./gallery/2.png
-  - ./gallery/3.png
+  - ./1.png
+  - ./2.png
+  - ./3.png
 releaseNotes: >-
   Initial packaging draft. Viewer, search API, and static-site container layout
   have been prepared for a future Umbrel community app release.
