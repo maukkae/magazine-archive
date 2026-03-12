@@ -14,13 +14,14 @@ Suggested screenshots:
 3. Search page with fast results
 4. Mobile view (optional)
 
-Bundled demo data:
+Bundled seed data:
 
-- one seeded issue for app testing: `Pelit 1992/01`
-- JPG pages + thumbnails
-- minimal `manifest.json`
-- minimal `search_index.json`
-- matching `search.db`
+- static site files
+- empty `manifest.json`
+- empty `search_index.json`
+- matching empty `search.db`
+
+No real magazine JPG/PDF content is bundled in the app draft.
 
 Recommended icon concept:
 
