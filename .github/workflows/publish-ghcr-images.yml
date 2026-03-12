@@ -25,12 +25,15 @@ jobs:
         include:
           - name: viewer
             context: ./maukka-magazine-archive/viewer
+            dockerfile: ./maukka-magazine-archive/viewer/Dockerfile
             image: ghcr.io/maukkae/magazine-archive-viewer
           - name: search
             context: ./maukka-magazine-archive/search
+            dockerfile: ./maukka-magazine-archive/search/Dockerfile
             image: ghcr.io/maukkae/magazine-archive-search
           - name: init
-            context: ./maukka-magazine-archive/init
+            context: ./maukka-magazine-archive
+            dockerfile: ./maukka-magazine-archive/init/Dockerfile
             image: ghcr.io/maukkae/magazine-archive-init
 
     steps:
@@ -60,6 +63,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
