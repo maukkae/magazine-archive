@@ -629,7 +629,7 @@
 <script>
     const t = Lang.t.bind(Lang);
     const params  = new URLSearchParams(location.search);
-    const mag     = params.get('mag')   || 'Pelit';
+    const mag     = params.get('mag')   || 'Magazine Archive';
     const year    = params.get('year')  || '1992';
     const issue   = (params.get('issue') || '01').padStart(2, '0');
     const requestedPageNum = parseInt(params.get('page') || '1', 10);

@@ -339,7 +339,7 @@
         <script src="lang.js"></script>
         <script>
                 const t = Lang.t.bind(Lang);
-                const MAGAZINES = ['Hifimaailma', 'PC-Pelit', 'Pelit', 'Pelit_Vuosikirja', 'TM'];
+                const MAGAZINES = [];
 
                 const carousel          = document.getElementById('carousel');
                 const magSelect         = document.getElementById('magSelect');
@@ -402,7 +402,7 @@
                 }
 
                 // Extract year + issue from a cover filename given current mag.
-                // e.g. 'PC-Pelit_1990_01_cover.jpg' + mag='PC-Pelit' -> {yr:'1990', iss:'01'}
+                // Example cover filename parsing for a magazine issue
                 function coverParts(cover) {
                         const rest  = cover.slice(currentMag.length + 1).replace('_cover.jpg', '');
                         const parts = rest.split('_');

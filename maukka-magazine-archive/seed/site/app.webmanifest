@@ -1,6 +1,6 @@
 {
-  "name": "Pelit Viewer",
-  "short_name": "Pelit",
+  "name": "Magazine Archive",
+  "short_name": "Archive",
   "start_url": "/mobile.html",
   "scope": "/",
   "display": "standalone",

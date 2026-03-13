@@ -15,8 +15,8 @@ Usage:
     python extract.py --no-content                    # skip stage 2
     python extract.py --no-thumbnails                 # skip stage 3
     python extract.py --no-html-update                # skip HTML sync
-    python extract.py pdf/Pelit/Pelit_1995_06.pdf     # one PDF (stages 1–3)
-    python extract.py pdf/Pelit/Pelit_1995_06.pdf --covers-only
+    python extract.py pdf/Magazine/Magazine_1995_06.pdf     # one PDF (stages 1–3)
+    python extract.py pdf/Magazine/Magazine_1995_06.pdf --covers-only
 """
 
 import argparse
@@ -62,8 +62,8 @@ def _normalize_print_name(src: Path) -> Path:
     """Derive output filename for a cropped print PDF.
 
     Strips any ``_print`` suffix, then fixes MM_YYYY date ordering to YYYY_MM:
-      Hifimaailma_08_2009_print.pdf  ->  Hifimaailma_2009_08.pdf
-      Hifimaailma_01_2010.pdf        ->  Hifimaailma_2010_01.pdf
+      Magazine_08_2009_print.pdf  ->  Magazine_2009_08.pdf
+      Magazine_01_2010.pdf        ->  Magazine_2010_01.pdf
       SomeMag_2009_08_print.pdf      ->  SomeMag_2009_08.pdf   (already YYYY_MM)
     If neither condition applies a ``_cropped`` suffix is used instead.
     """

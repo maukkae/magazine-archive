@@ -1222,15 +1222,7 @@ function normalizeIssue(issue) {
 function normalizeMagGuess(raw) {
     const guess = String(raw || '').trim().replace(/[_-]+/g, ' ');
     if (!guess) return '';
-    const compact = guess.replace(/\s+/g, '').toLowerCase();
-    const known = {
-        pelit: 'Pelit',
-        pelitvuosikirja: 'Pelit_Vuosikirja',
-        pelitvuosikerta: 'Pelit_Vuosikirja',
-        pcpelit: 'PC-Pelit',
-        hifimaailma: 'Hifimaailma'
-    };
-    return known[compact] || '';
+    return '';
 }
 
 function parseFilename(name) {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0d0d1a">
-    <meta name="apple-mobile-web-app-title" content="Pelit">
+    <meta name="apple-mobile-web-app-title" content="Magazine Archive">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/app.webmanifest">
@@ -339,7 +339,7 @@
 <script>
     const t = Lang.t.bind(Lang);
     const params  = new URLSearchParams(location.search);
-    const mag     = params.get('mag')   || 'Pelit';
+    const mag     = params.get('mag')   || 'Magazine Archive';
     const year    = params.get('year')  || '1992';
     const issue   = (params.get('issue') || '01').padStart(2, '0');
     const requestedPageNum = parseInt(params.get('page') || '1', 10);
