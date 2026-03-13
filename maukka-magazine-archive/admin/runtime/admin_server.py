@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import uuid
 from pathlib import Path
@@ -22,17 +23,26 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 from archive_paths import PDF_DIR, SCAN_DIR
 from extract import (
     JPG_DIR,
+    MANIFEST_FILE,
     SEARCH_INDEX_FILE,
     update_manifest,
     update_magazines_html,
 )
-from search_store import read_index_json, write_index_json
+from import_ocr_patch import import_patch, load_patch
+from ollama_ocr import (
+    DEFAULT_CLEANUP_MODEL,
+    DEFAULT_OCR_MODEL,
+    normalize_ollama_host,
+    ollama_test_connection,
+)
+from search_store import SEARCH_DB_FILE, read_index_json, write_index_json
 
 HOST     = os.environ.get("ADMIN_HOST", "127.0.0.1")
 PORT     = int(os.environ.get("ADMIN_PORT", "8001"))
 
 app  = Flask(__name__, static_folder=None)
 jobs = {}   # job_id -> {"queue": Queue, "status": "running"|"done"|"error"}
+SETTINGS_FILE = Path("admin_settings.json")
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +55,112 @@ def _read_index():
 
 def _write_index(data):
     write_index_json(data, index_path=SEARCH_INDEX_FILE)
+
+
+def _normalize_issue(issue: str) -> str:
+    issue = str(issue or "").strip()
+    if not re.match(r"^\d{1,4}$", issue):
+        return ""
+    return issue.zfill(2) if len(issue) == 1 else issue
+
+
+def _read_manifest():
+    if not MANIFEST_FILE.exists():
+        return {}
+    try:
+        return json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _write_manifest(data):
+    MANIFEST_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _settings_defaults():
+    return {
+        "ollama_host": "",
+        "use_ocr": False,
+        "ocr_model": DEFAULT_OCR_MODEL,
+        "cleanup_model": DEFAULT_CLEANUP_MODEL,
+        "use_cleanup": True,
+    }
+
+
+def _read_settings():
+    defaults = _settings_defaults()
+    if not SETTINGS_FILE.exists():
+        return defaults
+    try:
+        raw = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return defaults
+    settings = {**defaults, **raw}
+    settings["ollama_host"] = normalize_ollama_host(settings.get("ollama_host", ""))
+    settings["use_ocr"] = bool(settings.get("use_ocr", False))
+    settings["ocr_model"] = str(settings.get("ocr_model", "") or DEFAULT_OCR_MODEL).strip()
+    settings["cleanup_model"] = str(settings.get("cleanup_model", "") or DEFAULT_CLEANUP_MODEL).strip()
+    settings["use_cleanup"] = bool(settings.get("use_cleanup", True))
+    return settings
+
+
+def _write_settings(data):
+    settings = _settings_defaults()
+    settings.update(data or {})
+    settings["ollama_host"] = normalize_ollama_host(settings.get("ollama_host", ""))
+    settings["use_ocr"] = bool(settings.get("use_ocr", False))
+    settings["ocr_model"] = str(settings.get("ocr_model", "") or DEFAULT_OCR_MODEL).strip()
+    settings["cleanup_model"] = str(settings.get("cleanup_model", "") or DEFAULT_CLEANUP_MODEL).strip()
+    settings["use_cleanup"] = bool(settings.get("use_cleanup", True))
+    SETTINGS_FILE.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    return settings
+
+
+def _bool_request_value(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _request_ollama_settings():
+    saved = _read_settings()
+    host = normalize_ollama_host(request.form.get("ollama_host", saved.get("ollama_host", "")))
+    use_ocr = _bool_request_value(request.form.get("use_ocr"), saved.get("use_ocr", False))
+    ocr_model = str(request.form.get("ocr_model", saved.get("ocr_model", DEFAULT_OCR_MODEL)) or DEFAULT_OCR_MODEL).strip()
+    cleanup_model = str(request.form.get("cleanup_model", saved.get("cleanup_model", DEFAULT_CLEANUP_MODEL)) or DEFAULT_CLEANUP_MODEL).strip()
+    use_cleanup = _bool_request_value(request.form.get("use_cleanup"), saved.get("use_cleanup", True))
+    return {
+        "ollama_host": host,
+        "use_ocr": use_ocr,
+        "ocr_model": ocr_model,
+        "cleanup_model": cleanup_model,
+        "use_cleanup": use_cleanup,
+    }
+
+
+def _remove_issue_from_manifest(mag: str, year: str, issue: str):
+    manifest = _read_manifest()
+    mag_data = manifest.get(mag)
+    if not isinstance(mag_data, dict):
+        return
+    year_data = mag_data.get(year)
+    if not isinstance(year_data, dict):
+        return
+    year_data.pop(issue, None)
+    if not year_data:
+        mag_data.pop(year, None)
+    if not mag_data:
+        manifest.pop(mag, None)
+    _write_manifest(manifest)
+
+
+def _remove_magazine_from_manifest(mag: str):
+    manifest = _read_manifest()
+    if mag in manifest:
+        manifest.pop(mag, None)
+        _write_manifest(manifest)
 
 
 @app.after_request
@@ -112,7 +228,7 @@ def _discover_magazines():
 # Job runner with SSE streaming
 # ---------------------------------------------------------------------------
 
-def _start_job(cmd: list[str]) -> str:
+def _start_job(cmd: list[str], extra_env: dict[str, str] | None = None) -> str:
     job_id = uuid.uuid4().hex
     q = queue.Queue()
     jobs[job_id] = {"queue": q, "status": "running"}
@@ -122,9 +238,12 @@ def _start_job(cmd: list[str]) -> str:
             # Insert -u after the interpreter so Python flushes stdout after
             # every print() instead of batching into 8 KB blocks.
             unbuffered_cmd = [cmd[0], "-u"] + cmd[1:]
+            env = os.environ.copy()
+            if extra_env:
+                env.update({k: v for k, v in extra_env.items() if v is not None})
             proc = subprocess.Popen(
                 unbuffered_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, cwd=Path(".").resolve(),
+                text=True, bufsize=1, cwd=Path(".").resolve(), env=env,
             )
             while True:
                 line = proc.stdout.readline()
@@ -169,6 +288,36 @@ def stream(job_id):
 @app.get("/api/magazines")
 def api_magazines():
     return jsonify(_discover_magazines())
+
+
+@app.get("/api/ollama-settings")
+def api_ollama_settings():
+    return jsonify(_read_settings())
+
+
+@app.post("/api/ollama-settings")
+def api_save_ollama_settings():
+    data = request.json or {}
+    settings = _write_settings(
+        {
+            "ollama_host": data.get("ollama_host", ""),
+            "use_ocr": data.get("use_ocr", False),
+            "ocr_model": data.get("ocr_model", DEFAULT_OCR_MODEL),
+            "cleanup_model": data.get("cleanup_model", DEFAULT_CLEANUP_MODEL),
+            "use_cleanup": data.get("use_cleanup", True),
+        }
+    )
+    return jsonify({"ok": True, "settings": settings})
+
+
+@app.post("/api/ollama-test")
+def api_ollama_test():
+    data = request.json or {}
+    host = data.get("ollama_host", "")
+    ocr_model = data.get("ocr_model", DEFAULT_OCR_MODEL)
+    cleanup_model = data.get("cleanup_model", DEFAULT_CLEANUP_MODEL) if data.get("use_cleanup", True) else None
+    result = ollama_test_connection(host, ocr_model=ocr_model, cleanup_model=cleanup_model)
+    return jsonify(result), (200 if result.get("ok") else 400)
 
 
 @app.post("/api/update-page")
@@ -308,9 +457,19 @@ def api_remove_magazine():
     if not mag:
         return jsonify({"error": "missing mag"}), 400
 
+    _remove_magazine_from_manifest(mag)
+
     mag_dir = JPG_DIR / mag
     if mag_dir.is_dir():
         shutil.rmtree(mag_dir)
+
+    pdf_dir = PDF_DIR / mag
+    if pdf_dir.is_dir():
+        shutil.rmtree(pdf_dir)
+
+    scan_dir = SCAN_DIR / mag
+    if scan_dir.is_dir():
+        shutil.rmtree(scan_dir)
 
     idx = _read_index()
     idx["pages"]   = [p for p in idx["pages"]   if p["mag"] != mag]
@@ -332,9 +491,24 @@ def api_remove_issue():
     if not (mag and year and issue):
         return jsonify({"error": "missing fields"}), 400
 
+    _remove_issue_from_manifest(mag, year, issue)
+
     issue_dir = JPG_DIR / mag / year / issue
     if issue_dir.is_dir():
         shutil.rmtree(issue_dir)
+
+    pdf_dir = PDF_DIR / mag
+    for pdf_name in [
+        f"{mag}_{year}_{issue}.pdf",
+        f"{mag}_{year}_{issue}_print.pdf",
+    ]:
+        pdf_path = pdf_dir / pdf_name
+        if pdf_path.exists():
+            pdf_path.unlink()
+
+    scan_issue_dir = SCAN_DIR / mag / year / issue
+    if scan_issue_dir.is_dir():
+        shutil.rmtree(scan_issue_dir)
 
     cover = JPG_DIR / mag / year / f"{mag}_{year}_{issue}_cover.jpg"
     if cover.exists():
@@ -345,11 +519,22 @@ def api_remove_issue():
     if year_dir.is_dir() and not any(year_dir.iterdir()):
         year_dir.rmdir()
 
+    scan_year_dir = SCAN_DIR / mag / year
+    if scan_year_dir.is_dir() and not any(scan_year_dir.iterdir()):
+        scan_year_dir.rmdir()
+
     # Remove empty mag dir
     mag_dir = JPG_DIR / mag
     if mag_dir.is_dir() and not any(mag_dir.iterdir()):
         mag_dir.rmdir()
         update_magazines_html(_all_magazines())
+
+    if pdf_dir.is_dir() and not any(pdf_dir.iterdir()):
+        pdf_dir.rmdir()
+
+    scan_mag_dir = SCAN_DIR / mag
+    if scan_mag_dir.is_dir() and not any(scan_mag_dir.iterdir()):
+        scan_mag_dir.rmdir()
 
     key = f"{mag}/{year}/{issue}"
     idx = _read_index()
@@ -391,22 +576,52 @@ def api_rebuild_manifest():
     return jsonify({"ok": True})
 
 
+@app.post("/api/import-ocr-patch")
+def api_import_ocr_patch():
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "missing file"}), 400
+    if not f.filename.lower().endswith(".json"):
+        return jsonify({"error": "expected a .json OCR patch file"}), 400
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+            tmp.write(f.read())
+            tmp_path = Path(tmp.name)
+        patch = load_patch(tmp_path)
+        import_patch(patch, index_path=SEARCH_INDEX_FILE, db_path=SEARCH_DB_FILE)
+    finally:
+        if tmp_path and tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
+    return jsonify(
+        {
+            "ok": True,
+            "mag": str(patch["mag"]),
+            "year": str(patch["year"]),
+            "issue": str(patch["issue"]).zfill(2),
+            "pages": len(patch["pages"]),
+        }
+    )
+
+
 @app.post("/api/upload/pdf")
 def api_upload_pdf():
     mag              = request.form.get("mag",              "").strip()
     year             = request.form.get("year",             "").strip()
-    issue            = request.form.get("issue",            "").strip()
+    issue            = _normalize_issue(request.form.get("issue", "").strip())
     crop             = request.form.get("crop",             "").strip() == "1"
     sharpen          = request.form.get("sharpen",          "").strip() == "1"
     sharpen_radius   = request.form.get("sharpen_radius",   "0.3").strip()
-    sharpen_percent  = request.form.get("sharpen_percent",  "250").strip()
+    sharpen_percent  = request.form.get("sharpen_percent",  "150").strip()
     sharpen_threshold= request.form.get("sharpen_threshold","3").strip()
     f                = request.files.get("file")
     if not (mag and year and issue and f):
         return jsonify({"error": "missing fields"}), 400
     if not re.match(r"^\d{4}$", year):
         return jsonify({"error": "invalid year"}), 400
-    if not re.match(r"^\d{2,}$", issue):
+    if not issue:
         return jsonify({"error": "invalid issue"}), 400
 
     dest_dir = PDF_DIR / mag
@@ -426,7 +641,17 @@ def api_upload_pdf():
                       "--sharpen-percent",   sharpen_percent,
                       "--sharpen-threshold", sharpen_threshold]
 
-    job_id = _start_job([sys.executable, "extract.py", str(dest)] + cmd_extra)
+    settings = _request_ollama_settings()
+    extra_env = {}
+    if settings.get("ollama_host") and settings.get("use_ocr"):
+        extra_env = {
+            "ARCHIVE_OLLAMA_HOST": settings["ollama_host"],
+            "ARCHIVE_OCR_MODEL": settings["ocr_model"],
+            "ARCHIVE_CLEANUP_MODEL": settings["cleanup_model"],
+            "ARCHIVE_OLLAMA_USE_CLEANUP": "1" if settings["use_cleanup"] else "0",
+        }
+
+    job_id = _start_job([sys.executable, "extract.py", str(dest)] + cmd_extra, extra_env=extra_env)
     return jsonify({"ok": True, "job_id": job_id})
 
 
@@ -434,9 +659,11 @@ def api_upload_pdf():
 def api_upload_scans():
     mag   = request.form.get("mag",   "").strip()
     year  = request.form.get("year",  "").strip()
-    issue = request.form.get("issue", "").strip()
+    issue = _normalize_issue(request.form.get("issue", "").strip())
     if not (mag and year and issue):
         return jsonify({"error": "missing fields"}), 400
+    if not re.match(r"^\d{4}$", year):
+        return jsonify({"error": "invalid year"}), 400
 
     dest_dir = SCAN_DIR / mag / year / issue
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -456,7 +683,17 @@ def api_upload_scans():
     if ocr_pdf:
         ocr_pdf.save(dest_dir / f"{mag}_{year}_{issue}_OCR.pdf")
 
-    job_id = _start_job([sys.executable, "import_scans.py", str(dest_dir)])
+    settings = _request_ollama_settings()
+    extra_env = {}
+    if settings.get("ollama_host") and settings.get("use_ocr"):
+        extra_env = {
+            "ARCHIVE_OLLAMA_HOST": settings["ollama_host"],
+            "ARCHIVE_OCR_MODEL": settings["ocr_model"],
+            "ARCHIVE_CLEANUP_MODEL": settings["cleanup_model"],
+            "ARCHIVE_OLLAMA_USE_CLEANUP": "1" if settings["use_cleanup"] else "0",
+        }
+
+    job_id = _start_job([sys.executable, "import_scans.py", str(dest_dir)], extra_env=extra_env)
     return jsonify({"ok": True, "job_id": job_id})
 
 

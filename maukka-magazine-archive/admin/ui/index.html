@@ -38,6 +38,9 @@ body {
         radial-gradient(circle at top right, rgba(233, 69, 96, 0.16), transparent 26%),
         linear-gradient(180deg, #11162d 0%, #0d0d1a 42%, #090914 100%);
 }
+body.log-expanded {
+    padding-bottom: calc(50vh + 20px);
+}
 
 #topBar {
     position: sticky;
@@ -252,6 +255,7 @@ body {
     border-radius: 8px; padding: 4px 7px; font-size: 12px; outline: none;
 }
 .pdf-field:focus { border-color: var(--accent); color: #fff; }
+.pdf-field.mag   { width: 160px; }
 .pdf-field.year  { width: 46px; }
 .pdf-field.issue { width: 36px; }
 .pdf-status {
@@ -284,6 +288,47 @@ body {
     display: inline-block;
 }
 .file-pick-btn:hover { border-color: var(--accent); color: #fff; }
+.drop-zone {
+    border: 2px dashed var(--line);
+    border-radius: 18px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--soft);
+    font-size: 14px;
+    margin-bottom: 14px;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+    background: rgba(17, 24, 39, 0.35);
+}
+.drop-zone:hover { border-color: rgba(233, 69, 96, 0.32); color: var(--muted); }
+.drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(76, 14, 34, 0.45);
+    color: var(--text);
+}
+.drop-zone .drop-icon { font-size: 28px; margin-bottom: 8px; }
+.drop-zone .drop-sub  { font-size: 12px; color: var(--soft); margin-top: 4px; }
+.drop-zone.drag-over .drop-sub { color: var(--muted); }
+.picker-wrap {
+    position: relative;
+    display: inline-flex;
+    width: 100%;
+}
+.picker-wrap input {
+    width: 100%;
+    padding-right: 34px !important;
+}
+.picker-wrap::after {
+    content: "▾";
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-52%);
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+}
 
 /* File list for scans */
 #file-list { margin: 10px 0; }
@@ -317,7 +362,9 @@ body {
     height: 200px; display: flex; flex-direction: column; z-index: 100;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    transition: height 0.2s ease;
 }
+#log-panel.expanded { height: 50vh; }
 #log-header {
     display: flex; align-items: center; padding: 6px 12px; gap: 8px;
     background: rgba(22, 33, 62, 0.84); border-bottom: 1px solid var(--line); flex-shrink: 0;
@@ -499,6 +546,7 @@ body {
 <div id="topBar">
     <span class="title">ADMIN</span>
     <span class="subtitle">Magazine Archive</span>
+    <button onclick="triggerPatchImport()">Patch OCR data</button>
     <button onclick="loadMagazines()">↺ Refresh</button>
 </div>
 
@@ -524,18 +572,16 @@ body {
 
         <!-- PDF upload -->
         <div id="upload-pdf" class="upload-pane active">
+            <input type="file" id="ocr-patch-file" accept=".json,application/json" style="display:none">
             <div id="pdf-drop-zone">
                 <input type="file" id="pdf-file" accept=".pdf" multiple style="display:none">
                 <div class="drop-icon">&#128196;</div>
                 Drop PDF(s) here or <u>click to browse</u>
                 <div class="drop-sub">You can drop multiple files at once</div>
             </div>
+            <datalist id="magazine-options"></datalist>
             <div id="pdf-queue"></div>
             <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
-                <div class="form-group" style="margin-bottom:0">
-                    <label>Magazine</label>
-                    <input type="text" id="pdf-mag" placeholder="e.g. Pelit">
-                </div>
                 <label class="crop-option" style="margin-bottom:0; align-self:flex-end;">
                     <input type="checkbox" id="pdf-crop">
                     <div>
@@ -559,8 +605,8 @@ body {
                         <input type="text" id="sharpen-radius" value="0.3" style="width:70px;">
                     </div>
                     <div class="form-group" style="margin-bottom:8px;">
-                        <label>Percent <span style="color:#444;font-size:11px;">(PIL scale, default 80)</span></label>
-                        <input type="text" id="sharpen-percent" value="250" style="width:70px;">
+                        <label>Percent <span style="color:#444;font-size:11px;">(default 150)</span></label>
+                        <input type="text" id="sharpen-percent" value="150" style="width:70px;">
                     </div>
                     <div class="form-group" style="margin-bottom:8px;">
                         <label>Threshold <span style="color:#444;font-size:11px;">(noise guard, default 3)</span></label>
@@ -577,18 +623,22 @@ body {
         <!-- Scans upload -->
         <div id="upload-scans" class="upload-pane">
             <div class="form-group">
-                <label>Page JPEGs</label>
-                <label class="file-pick-btn">
-                    Choose JPEGs…
-                    <input type="file" id="scan-files" accept=".jpg,.jpeg" multiple style="display:none">
-                </label>
+                <label>Page JPEGs and optional OCR PDF</label>
+                <div id="scan-drop-zone" class="drop-zone">
+                    <input type="file" id="scan-files" accept=".jpg,.jpeg,.pdf" multiple style="display:none">
+                    <div class="drop-icon">&#128228;</div>
+                    Drop JPG pages and an optional OCR PDF here or <u>click to browse</u>
+                    <div class="drop-sub">You can add all scan JPGs and the companion OCR PDF in one drop</div>
+                </div>
                 <div id="scan-detected" class="detected" style="display:none"></div>
             </div>
             <div id="file-list"></div>
             <div style="display:flex; gap:16px; flex-wrap:wrap;">
                 <div class="form-group">
                     <label>Magazine</label>
-                    <input type="text" id="scan-mag" placeholder="e.g. TM">
+                    <div class="picker-wrap">
+                        <input type="text" id="scan-mag" list="magazine-options" placeholder="Choose existing or type a new one">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Year</label>
@@ -608,6 +658,38 @@ body {
                 <div id="ocr-detected" class="detected" style="display:none"></div>
             </div>
             <button class="btn btn-primary" onclick="uploadScans()">Upload &amp; Import</button>
+        </div>
+
+        <div class="crop-option" style="margin-top:16px; flex-wrap:wrap; align-items:flex-end; gap:14px;">
+            <div style="display:flex; flex-direction:column; gap:4px; min-width:200px; flex:1;">
+                <div class="crop-option-label">Connect to Ollama</div>
+                <div class="crop-option-hint">Use a remote Ollama host for GLM-OCR and optional Mistral cleanup during import.</div>
+            </div>
+            <div class="form-group" style="margin-bottom:0; min-width:220px;">
+                <label>Host</label>
+                <input type="text" id="ollama-host" placeholder="192.168.1.111:11434">
+            </div>
+            <div class="form-group" style="margin-bottom:0; min-width:180px;">
+                <label>OCR model</label>
+                <input type="text" id="ollama-ocr-model" value="glm-ocr:latest">
+            </div>
+            <div class="form-group" style="margin-bottom:0; min-width:180px;">
+                <label>Cleanup model</label>
+                <input type="text" id="ollama-cleanup-model" value="mistral-small:24b">
+            </div>
+            <label class="crop-option" style="margin:0; padding:10px 12px;">
+                <input type="checkbox" id="ollama-use-ocr">
+                <div class="crop-option-label">Use Ollama OCR</div>
+            </label>
+            <label class="crop-option" style="margin:0; padding:10px 12px;">
+                <input type="checkbox" id="ollama-use-cleanup" checked>
+                <div class="crop-option-label">Use Mistral cleanup</div>
+            </label>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button class="btn btn-ghost" type="button" onclick="testOllamaSettings()">Test</button>
+                <button class="btn btn-primary" type="button" onclick="saveOllamaSettings()">Save</button>
+                <span id="ollama-status" style="font-size:12px; color:var(--muted); min-width:160px;"></span>
+            </div>
         </div>
     </div>
 
@@ -629,6 +711,7 @@ body {
 <div id="review-panel">
     <div id="review-header">
         <span id="review-title">OCR Review</span>
+        <button class="btn btn-ghost btn-sm" onclick="triggerPatchImport()">Patch OCR data</button>
         <button class="btn btn-ghost btn-sm" onclick="closeReview()">✕ Close</button>
     </div>
     <div id="review-summary">
@@ -646,6 +729,7 @@ body {
 <div id="log-panel">
     <div id="log-header">
         <span>LOG</span>
+        <button id="log-toggle-btn" onclick="toggleLogPanel()" title="Expand log">↑</button>
         <button onclick="clearLog()">Clear</button>
     </div>
     <div id="log-body"></div>
@@ -685,8 +769,40 @@ function logLine(text, cls = '') {
     div.textContent = text;
     body.appendChild(div);
     body.scrollTop = body.scrollHeight;
+    return div;
 }
 function clearLog() { document.getElementById('log-body').innerHTML = ''; }
+function toggleLogPanel() {
+    const panel = document.getElementById('log-panel');
+    const expanded = panel.classList.toggle('expanded');
+    document.body.classList.toggle('log-expanded', expanded);
+    const btn = document.getElementById('log-toggle-btn');
+    if (btn) {
+        btn.textContent = expanded ? '↓' : '↑';
+        btn.title = expanded ? 'Collapse log' : 'Expand log';
+    }
+}
+
+function beginProgressLog(text) {
+    const entry = logLine(text);
+    let dots = 0;
+    const timer = setInterval(() => {
+        dots = (dots + 1) % 4;
+        entry.textContent = `${text}${'.'.repeat(dots)}`;
+    }, 700);
+    return {
+        done(finalText, cls = 'done') {
+            clearInterval(timer);
+            entry.className = 'log-line' + (cls ? ' ' + cls : '');
+            entry.textContent = finalText;
+        },
+        fail(finalText) {
+            clearInterval(timer);
+            entry.className = 'log-line error';
+            entry.textContent = finalText;
+        }
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Toast
@@ -701,11 +817,142 @@ function toast(msg, type = 'ok') {
     toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
 
+function triggerPatchImport() {
+    const input = document.getElementById('ocr-patch-file');
+    if (input) {
+        input.value = '';
+        input.click();
+    }
+}
+
+async function uploadOcrPatch(file) {
+    if (!file) return;
+    logLine(`Importing OCR patch ${file.name}...`);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+        const result = await fetchJson(apiUrl('/import-ocr-patch'), { method: 'POST', body: fd });
+        logLine(`OCR patch imported for ${result.mag}/${result.year}/${result.issue} (${result.pages} page(s)).`, 'done');
+        toast(`OCR patch imported for ${result.mag} ${result.issue}/${result.year}`);
+        await loadMagazines();
+        const title = document.getElementById('review-title')?.textContent || '';
+        if (title.includes(`${result.mag} ${result.issue}/${result.year}`)) {
+            openReview(result.mag, result.year, result.issue);
+        }
+    } catch (e) {
+        logLine(`OCR patch import failed: ${e}`, 'error');
+        toast(String(e), 'error');
+    }
+}
+
+document.getElementById('ocr-patch-file')?.addEventListener('change', function () {
+    const file = this.files && this.files[0];
+    if (file) {
+        uploadOcrPatch(file);
+    }
+    this.value = '';
+});
+
+async function loadOllamaSettings() {
+    try {
+        const settings = await fetchJson(apiUrl('/ollama-settings'));
+        document.getElementById('ollama-host').value = settings.ollama_host || '';
+        document.getElementById('ollama-use-ocr').checked = settings.use_ocr === true;
+        document.getElementById('ollama-ocr-model').value = settings.ocr_model || 'glm-ocr:latest';
+        document.getElementById('ollama-cleanup-model').value = settings.cleanup_model || 'mistral-small:24b';
+        document.getElementById('ollama-use-cleanup').checked = settings.use_cleanup !== false;
+        document.getElementById('ollama-status').textContent = settings.ollama_host
+            ? `${settings.use_ocr ? 'Enabled' : 'Saved'}: ${settings.ollama_host}`
+            : 'Not configured';
+    } catch (_) {
+        document.getElementById('ollama-status').textContent = 'Settings unavailable';
+    }
+}
+
+async function saveOllamaSettings() {
+    const payload = {
+        ollama_host: document.getElementById('ollama-host').value.trim(),
+        use_ocr: document.getElementById('ollama-use-ocr').checked,
+        ocr_model: document.getElementById('ollama-ocr-model').value.trim(),
+        cleanup_model: document.getElementById('ollama-cleanup-model').value.trim(),
+        use_cleanup: document.getElementById('ollama-use-cleanup').checked,
+    };
+    try {
+        const result = await fetchJson(apiUrl('/ollama-settings'), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        document.getElementById('ollama-status').textContent = result.settings.ollama_host
+            ? `${result.settings.use_ocr ? 'Enabled' : 'Saved'}: ${result.settings.ollama_host}`
+            : 'Disabled';
+        toast('Ollama settings saved');
+    } catch (e) {
+        document.getElementById('ollama-status').textContent = 'Save failed';
+        toast(String(e), 'error');
+    }
+}
+
+async function testOllamaSettings() {
+    const payload = {
+        ollama_host: document.getElementById('ollama-host').value.trim(),
+        use_ocr: document.getElementById('ollama-use-ocr').checked,
+        ocr_model: document.getElementById('ollama-ocr-model').value.trim(),
+        cleanup_model: document.getElementById('ollama-cleanup-model').value.trim(),
+        use_cleanup: document.getElementById('ollama-use-cleanup').checked,
+    };
+    document.getElementById('ollama-status').textContent = 'Testing...';
+    try {
+        const result = await fetchJson(apiUrl('/ollama-test'), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        document.getElementById('ollama-status').textContent = result.message || 'Connection OK';
+        toast(result.message || 'Ollama connection OK');
+    } catch (e) {
+        document.getElementById('ollama-status').textContent = 'Connection failed';
+        toast(String(e), 'error');
+    }
+}
+
+function appendOllamaSettingsToFormData(fd) {
+    fd.append('ollama_host', document.getElementById('ollama-host').value.trim());
+    fd.append('use_ocr', document.getElementById('ollama-use-ocr').checked ? '1' : '0');
+    fd.append('ocr_model', document.getElementById('ollama-ocr-model').value.trim());
+    fd.append('cleanup_model', document.getElementById('ollama-cleanup-model').value.trim());
+    fd.append('use_cleanup', document.getElementById('ollama-use-cleanup').checked ? '1' : '0');
+}
+
 const EMBEDDED_APP_ADMIN = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
 const API_BASE = EMBEDDED_APP_ADMIN ? '/admin-api' : '/api';
 
 function apiUrl(path) {
     return `${API_BASE}${path}`;
+}
+
+async function fetchJson(url, options = {}) {
+    const res = await fetch(url, options);
+    const raw = await res.text();
+    let data = null;
+
+    if (raw) {
+        try {
+            data = JSON.parse(raw);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${raw.slice(0, 240)}`);
+            }
+            throw new Error(`Invalid JSON response: ${raw.slice(0, 240)}`);
+        }
+    }
+
+    if (!res.ok) {
+        const message = data && data.error ? data.error : `HTTP ${res.status}`;
+        throw new Error(message);
+    }
+
+    return data || {};
 }
 
 // ---------------------------------------------------------------------------
@@ -755,18 +1002,37 @@ function openViewer(mag, year, issue, page = 1) {
 // ---------------------------------------------------------------------------
 // Magazine list
 // ---------------------------------------------------------------------------
+let magazineNames = [];
+
 async function loadMagazines() {
+    const openMags = new Set(
+        Array.from(document.querySelectorAll('.mag-header.open .mag-name')).map(el => el.textContent.trim())
+    );
     document.getElementById('mag-list').innerHTML = '<div id="loading">Loading...</div>';
     const data = await fetch(apiUrl('/magazines')).then(r => r.json());
+    magazineNames = data.map(m => m.mag).sort((a, b) => a.localeCompare(b));
+    renderMagazineOptions();
     const list = document.getElementById('mag-list');
     list.innerHTML = '';
     if (!data.length) { list.innerHTML = '<div id="loading">No magazines found in jpg/</div>'; return; }
-    data.forEach(m => list.appendChild(buildMagCard(m)));
+    data.forEach(m => list.appendChild(buildMagCard(m, openMags.has(m.mag))));
 }
 
-function buildMagCard(m) {
+function renderMagazineOptions() {
+    const list = document.getElementById('magazine-options');
+    if (!list) return;
+    list.innerHTML = '';
+    magazineNames.forEach(mag => {
+        const option = document.createElement('option');
+        option.value = mag;
+        list.appendChild(option);
+    });
+}
+
+function buildMagCard(m, isOpen = false) {
     const card = document.createElement('div');
     card.className = 'mag-card';
+    card.dataset.mag = m.mag;
 
     const header = document.createElement('div');
     header.className = 'mag-header';
@@ -789,6 +1055,9 @@ function buildMagCard(m) {
         y.issues.forEach(iss => {
             const row = document.createElement('div');
             row.className = 'issue-row';
+            row.dataset.mag = m.mag;
+            row.dataset.year = y.year;
+            row.dataset.issue = iss.issue;
             const badge = iss.indexed
                 ? `<span class="badge badge-ok">indexed ${iss.index_pages}p</span>`
                 : iss.no_text
@@ -816,7 +1085,30 @@ function buildMagCard(m) {
 
     card.appendChild(header);
     card.appendChild(body);
+    if (isOpen) {
+        header.classList.add('open');
+        body.classList.add('open');
+    }
     return card;
+}
+
+function removeIssueRowLocally(mag, year, issue) {
+    const row = document.querySelector(`.issue-row[data-mag="${CSS.escape(mag)}"][data-year="${CSS.escape(year)}"][data-issue="${CSS.escape(issue)}"]`);
+    if (!row) return;
+    const yearSection = row.closest('.year-section');
+    const magCard = row.closest('.mag-card');
+    row.remove();
+    if (yearSection && yearSection.querySelectorAll('.issue-row').length === 0) {
+        yearSection.remove();
+    }
+    if (magCard && magCard.querySelectorAll('.year-section').length === 0) {
+        magCard.remove();
+    }
+}
+
+function removeMagazineLocally(mag) {
+    const card = document.querySelector(`.mag-card[data-mag="${CSS.escape(mag)}"]`);
+    if (card) card.remove();
 }
 
 function makeIssueActions(mag, year, issue, indexed) {
@@ -863,64 +1155,131 @@ function confirmBtn(label, cls, confirmLabel, action) {
 }
 
 async function removeMagazine(mag) {
-    logLine(`Removing magazine ${mag}…`);
+    const progress = beginProgressLog(`Removing magazine ${mag}`);
     const r = await fetch(apiUrl('/remove/magazine'), {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ mag }),
     }).then(r => r.json());
-    if (r.ok) { toast(`${mag} removed`); loadMagazines(); }
-    else toast(r.error || 'Error', 'error');
+    if (r.ok) {
+        removeMagazineLocally(mag);
+        progress.done(`${mag} removed.`);
+        toast(`${mag} removed`);
+        loadMagazines();
+    }
+    else {
+        progress.fail(`Failed to remove ${mag}: ${r.error || 'Error'}`);
+        toast(r.error || 'Error', 'error');
+    }
 }
 
 async function removeIssue(mag, year, issue) {
-    logLine(`Removing ${mag}/${year}/${issue}…`);
+    const progress = beginProgressLog(`Removing ${mag}/${year}/${issue}`);
     const r = await fetch(apiUrl('/remove/issue'), {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ mag, year, issue }),
     }).then(r => r.json());
-    if (r.ok) { toast(`${mag} ${issue}/${year} removed`); loadMagazines(); }
-    else toast(r.error || 'Error', 'error');
+    if (r.ok) {
+        removeIssueRowLocally(mag, year, issue);
+        progress.done(`${mag}/${year}/${issue} removed.`);
+        toast(`${mag} ${issue}/${year} removed`);
+        loadMagazines();
+    }
+    else {
+        progress.fail(`Failed to remove ${mag}/${year}/${issue}: ${r.error || 'Error'}`);
+        toast(r.error || 'Error', 'error');
+    }
 }
 
 async function clearIndex(params) {
     const label = params.issue
         ? `${params.mag}/${params.year}/${params.issue}`
         : params.mag;
-    logLine(`Clearing index for ${label}…`);
+    const progress = beginProgressLog(`Clearing index for ${label}`);
     const r = await fetch(apiUrl('/clear-index'), {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(params),
     }).then(r => r.json());
-    if (r.ok) { toast(`Index cleared for ${label}`); loadMagazines(); }
-    else toast(r.error || 'Error', 'error');
+    if (r.ok) {
+        progress.done(`Index cleared for ${label}.`);
+        toast(`Index cleared for ${label}`);
+        loadMagazines();
+    }
+    else {
+        progress.fail(`Failed to clear index for ${label}: ${r.error || 'Error'}`);
+        toast(r.error || 'Error', 'error');
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Filename auto-detection
 // ---------------------------------------------------------------------------
+function normalizeIssue(issue) {
+    const clean = String(issue || '').trim();
+    if (!/^\d{1,4}$/.test(clean)) return '';
+    return clean.length === 1 ? `0${clean}` : clean;
+}
+
+function normalizeMagGuess(raw) {
+    const guess = String(raw || '').trim().replace(/[_-]+/g, ' ');
+    if (!guess) return '';
+    const compact = guess.replace(/\s+/g, '').toLowerCase();
+    const known = {
+        pelit: 'Pelit',
+        pelitvuosikirja: 'Pelit_Vuosikirja',
+        pelitvuosikerta: 'Pelit_Vuosikirja',
+        pcpelit: 'PC-Pelit',
+        hifimaailma: 'Hifimaailma'
+    };
+    return known[compact] || '';
+}
+
 function parseFilename(name) {
+    const base = String(name || '').replace(/\.[^.]+$/, '');
+
     // Scan JPG: Mag_YYYY_MM_NNN.jpg
-    let m = name.match(/^(.+)_(\d{4})_(\d{2,})_\d{3}\.jpe?g$/i);
-    if (m) return { mag: m[1], year: m[2], issue: m[3] };
-    // PDF: Mag_YYYY_MM.pdf or Mag_YYYY_MM_print.pdf
-    m = name.match(/^(.+)_(\d{4})_(\d{2,})(?:_print)?\.pdf$/i);
-    if (m) return { mag: m[1], year: m[2], issue: m[3] };
-    // PDF: Mag_MM_YYYY.pdf or Mag_MM_YYYY_print.pdf (print-house naming, flipped date)
-    m = name.match(/^(.+)_(\d{2})_(\d{4})(?:_print)?\.pdf$/i);
-    if (m) return { mag: m[1], year: m[3], issue: m[2] };
+    let m = base.match(/^(.+?)_(\d{4})_(\d{1,4})_\d{3}$/i);
+    if (m) return { mag: normalizeMagGuess(m[1]), year: m[2], issue: normalizeIssue(m[3]) };
+
+    // Token-based tolerant parsing for arbitrary names like hm_2016_1_lehtiluukku.pdf
+    const tokens = base.split(/[_\s-]+/).filter(Boolean);
+    for (let i = 0; i < tokens.length - 1; i++) {
+        if (/^\d{4}$/.test(tokens[i]) && /^\d{1,4}$/.test(tokens[i + 1])) {
+            return {
+                mag: normalizeMagGuess(tokens.slice(0, i).join(' ')),
+                year: tokens[i],
+                issue: normalizeIssue(tokens[i + 1]),
+            };
+        }
+        if (/^\d{1,4}$/.test(tokens[i]) && /^\d{4}$/.test(tokens[i + 1])) {
+            return {
+                mag: normalizeMagGuess(tokens.slice(0, i).join(' ')),
+                year: tokens[i + 1],
+                issue: normalizeIssue(tokens[i]),
+            };
+        }
+    }
+
     // PDF: Mag_YYYY.pdf
-    m = name.match(/^(.+)_(\d{4})\.pdf$/i);
-    if (m) return { mag: m[1], year: m[2], issue: '01' };
+    m = base.match(/^(.+?)_(\d{4})$/i);
+    if (m) return { mag: normalizeMagGuess(m[1]), year: m[2], issue: '01' };
     return null;
 }
 
 function applyDetected(parsed, magEl, yearEl, issueEl, infoEl) {
     if (parsed) {
-        magEl.value   = parsed.mag;
-        yearEl.value  = parsed.year;
-        issueEl.value = parsed.issue;
-        infoEl.textContent = `Detected: ${parsed.mag} ${parsed.issue}/${parsed.year}`;
-        infoEl.className = 'detected';
+        if (parsed.mag) magEl.value = parsed.mag;
+        if (parsed.year) yearEl.value = parsed.year;
+        if (parsed.issue) issueEl.value = parsed.issue;
+
+        const detectedParts = [];
+        if (parsed.mag) detectedParts.push(parsed.mag);
+        if (parsed.issue && parsed.year) detectedParts.push(`${parsed.issue}/${parsed.year}`);
+        else if (parsed.year) detectedParts.push(parsed.year);
+
+        infoEl.textContent = detectedParts.length
+            ? `Detected: ${detectedParts.join(' ')}${parsed.mag ? '' : ' — fill magazine manually.'}`
+            : 'Could not detect Magazine/Year/Issue from filename — fill in manually.';
+        infoEl.className = parsed.mag ? 'detected' : 'detected warn';
         infoEl.style.display = 'block';
     } else {
         infoEl.textContent = 'Could not detect Magazine/Year/Issue from filename — fill in manually.';
@@ -932,7 +1291,7 @@ function applyDetected(parsed, magEl, yearEl, issueEl, infoEl) {
 // ---------------------------------------------------------------------------
 // PDF queue
 // ---------------------------------------------------------------------------
-let pdfQueue = [];   // [{file, year, issue, status:'pending'|'running'|'done'|'error'}]
+let pdfQueue = [];   // [{file, mag, year, issue, status:'pending'|'running'|'done'|'error'}]
 
 function pdfQueueChanged() {
     const btn = document.getElementById('pdf-upload-btn');
@@ -959,13 +1318,38 @@ function renderPdfQueue() {
 
         const fields = document.createElement('div');
         fields.className = 'pdf-item-fields';
-        fields.innerHTML = `
-            <label>Year</label>
-            <input class="pdf-field year" value="${item.year}" maxlength="4"
-                   onchange="pdfQueue[${idx}].year=this.value.trim()">
-            <label>Issue</label>
-            <input class="pdf-field issue" value="${item.issue}" maxlength="4"
-                   onchange="pdfQueue[${idx}].issue=this.value.trim()">`;
+
+        const magLabel = document.createElement('label');
+        magLabel.textContent = 'Magazine';
+        const magInput = document.createElement('input');
+        magInput.className = 'pdf-field mag';
+        magInput.placeholder = 'Choose or type';
+        magInput.value = item.mag || '';
+        enhanceMagazineInput(magInput);
+        magInput.onchange = () => { pdfQueue[idx].mag = magInput.value.trim(); };
+
+        const yearLabel = document.createElement('label');
+        yearLabel.textContent = 'Year';
+        const yearInput = document.createElement('input');
+        yearInput.className = 'pdf-field year';
+        yearInput.maxLength = 4;
+        yearInput.value = item.year || '';
+        yearInput.onchange = () => { pdfQueue[idx].year = yearInput.value.trim(); };
+
+        const issueLabel = document.createElement('label');
+        issueLabel.textContent = 'Issue';
+        const issueInput = document.createElement('input');
+        issueInput.className = 'pdf-field issue';
+        issueInput.maxLength = 4;
+        issueInput.value = item.issue || '';
+        issueInput.onchange = () => { pdfQueue[idx].issue = issueInput.value.trim(); };
+
+        fields.appendChild(magLabel);
+        fields.appendChild(magInput);
+        fields.appendChild(yearLabel);
+        fields.appendChild(yearInput);
+        fields.appendChild(issueLabel);
+        fields.appendChild(issueInput);
 
         const status = document.createElement('span');
         status.id = `pdf-status-${idx}`;
@@ -1007,16 +1391,11 @@ function setPdfItemStatus(idx, st) {
 function addPdfFiles(files) {
     const incoming = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
     if (!incoming.length) return;
-    const magEl = document.getElementById('pdf-mag');
-    if (!magEl.value.trim()) {
-        const p = parseFilename(incoming[0].name);
-        if (p) magEl.value = p.mag;
-    }
     const existing = new Set(pdfQueue.map(i => i.file.name));
     incoming.forEach(f => {
         if (existing.has(f.name)) return;
         const p = parseFilename(f.name);
-        pdfQueue.push({ file: f, year: p ? p.year : '', issue: p ? p.issue : '', status: 'pending' });
+        pdfQueue.push({ file: f, mag: p ? p.mag : '', year: p ? p.year : '', issue: p ? p.issue : '', status: 'pending' });
     });
     renderPdfQueue();
 }
@@ -1057,33 +1436,78 @@ document.getElementById('ocr-pdf').addEventListener('change', function () {
 // ---------------------------------------------------------------------------
 let scanFiles = [];   // ordered array of File objects
 
+function enhanceMagazineInput(input) {
+    input.setAttribute('list', 'magazine-options');
+    const show = () => {
+        if (typeof input.showPicker === 'function') {
+            try { input.showPicker(); } catch (_) {}
+        }
+    };
+    input.addEventListener('pointerdown', () => setTimeout(show, 0));
+    input.addEventListener('focus', () => setTimeout(show, 0));
+}
+
+enhanceMagazineInput(document.getElementById('scan-mag'));
+
 function pageNumFromName(name) {
     const m = name.match(/_(\d{3})\.jpe?g$/i);
     return m ? parseInt(m[1], 10) : null;
 }
 
+function setOcrPdfFile(file) {
+    const input = document.getElementById('ocr-pdf');
+    const dt = new DataTransfer();
+    if (file) dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function applyScanSelection(fileList) {
+    const allFiles = Array.from(fileList);
+    const jpgs = allFiles.filter(f => /\.(jpe?g)$/i.test(f.name));
+    const pdf = allFiles.find(f => /\.pdf$/i.test(f.name)) || null;
+    if (!jpgs.length && !pdf) return;
+
+    if (jpgs.length) {
+        jpgs.sort((a, b) => {
+            const na = pageNumFromName(a.name), nb = pageNumFromName(b.name);
+            if (na !== null && nb !== null) return na - nb;
+            return a.name.localeCompare(b.name);
+        });
+
+        scanFiles = jpgs;
+        const parsed = parseFilename(jpgs[0].name);
+        applyDetected(parsed,
+            document.getElementById('scan-mag'),
+            document.getElementById('scan-year'),
+            document.getElementById('scan-issue'),
+            document.getElementById('scan-detected'));
+
+        renderFileList();
+    }
+
+    if (pdf) setOcrPdfFile(pdf);
+}
+
 document.getElementById('scan-files').addEventListener('change', function () {
     if (!this.files.length) return;
-    const files = Array.from(this.files);
+    applyScanSelection(this.files);
+    this.value = '';
+});
 
-    // Sort by embedded page number if available, else by name
-    files.sort((a, b) => {
-        const na = pageNumFromName(a.name), nb = pageNumFromName(b.name);
-        if (na !== null && nb !== null) return na - nb;
-        return a.name.localeCompare(b.name);
-    });
-
-    scanFiles = files;
-
-    // Auto-detect from first file
-    const parsed = parseFilename(files[0].name);
-    applyDetected(parsed,
-        document.getElementById('scan-mag'),
-        document.getElementById('scan-year'),
-        document.getElementById('scan-issue'),
-        document.getElementById('scan-detected'));
-
-    renderFileList();
+const scanDropZone = document.getElementById('scan-drop-zone');
+scanDropZone.addEventListener('click', () => document.getElementById('scan-files').click());
+scanDropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    scanDropZone.classList.add('drag-over');
+});
+scanDropZone.addEventListener('dragleave', e => {
+    if (!scanDropZone.contains(e.relatedTarget)) scanDropZone.classList.remove('drag-over');
+});
+scanDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    scanDropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) applyScanSelection(e.dataTransfer.files);
 });
 
 function renderFileList() {
@@ -1137,23 +1561,21 @@ function toggleSharpenOptions() {
 }
 
 async function uploadPdfQueue() {
-    const mag              = document.getElementById('pdf-mag').value.trim();
     const crop             = document.getElementById('pdf-crop').checked;
     const sharpen          = document.getElementById('pdf-sharpen').checked;
     const sharpen_radius   = document.getElementById('sharpen-radius').value.trim();
     const sharpen_percent  = document.getElementById('sharpen-percent').value.trim();
     const sharpen_threshold= document.getElementById('sharpen-threshold').value.trim();
-    if (!mag) { toast('Fill in Magazine name.', 'error'); return; }
 
     const pending = pdfQueue.filter(i => i.status === 'pending');
     if (!pending.length) { toast('No files queued.', 'error'); return; }
 
-    // Validate all items have year + issue
+    // Validate all items have magazine + year + issue
     for (let i = 0; i < pdfQueue.length; i++) {
         const item = pdfQueue[i];
         if (item.status !== 'pending') continue;
-        if (!item.year || !item.issue) {
-            toast(`Missing year/issue for ${item.file.name}`, 'error'); return;
+        if (!item.mag || !item.year || !item.issue) {
+            toast(`Missing magazine/year/issue for ${item.file.name}`, 'error'); return;
         }
     }
 
@@ -1170,9 +1592,10 @@ async function uploadPdfQueue() {
 
         const fd = new FormData();
         fd.append('file', item.file);
-        fd.append('mag', mag);
+        fd.append('mag', item.mag);
         fd.append('year', item.year);
         fd.append('issue', item.issue);
+        appendOllamaSettingsToFormData(fd);
         if (crop) fd.append('crop', '1');
         if (sharpen) {
             fd.append('sharpen', '1');
@@ -1183,7 +1606,7 @@ async function uploadPdfQueue() {
 
         let r;
         try {
-            r = await fetch(apiUrl('/upload/pdf'), { method: 'POST', body: fd }).then(res => res.json());
+            r = await fetchJson(apiUrl('/upload/pdf'), { method: 'POST', body: fd });
         } catch (e) {
             setPdfItemStatus(i, 'error');
             logLine(`Upload failed: ${e}`, 'error');
@@ -1226,12 +1649,19 @@ async function uploadScans() {
     logLine(`Uploading ${scanFiles.length} page(s) for ${mag} ${issue}/${year}…`);
     const fd = new FormData();
     fd.append('mag', mag); fd.append('year', year); fd.append('issue', issue);
+    appendOllamaSettingsToFormData(fd);
     scanFiles.forEach((f, i) => fd.append(`page_${i}`, f));
 
     const ocrFile = document.getElementById('ocr-pdf').files[0];
     if (ocrFile) fd.append('ocr_pdf', ocrFile);
 
-    const r = await fetch(apiUrl('/upload/scans'), { method: 'POST', body: fd }).then(r => r.json());
+    let r;
+    try {
+        r = await fetchJson(apiUrl('/upload/scans'), { method: 'POST', body: fd });
+    } catch (e) {
+        toast(String(e), 'error');
+        return;
+    }
     if (r.job_id) {
         streamJob(r.job_id, loadMagazines);
     } else {

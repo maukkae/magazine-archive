@@ -245,20 +245,69 @@ def rebuild_search_db(index_data: dict, db_path: Path = SEARCH_DB_FILE) -> None:
         conn.close()
 
 
-def write_index_json(index_data: dict, index_path: Path = SEARCH_INDEX_JSON, db_path: Path = SEARCH_DB_FILE) -> None:
-    index_path = Path(index_path)
-    db_path = Path(db_path)
-    payload = {
+def _normalized_payload(index_data: dict) -> dict:
+    return {
         "pages": index_data.get("pages", []),
         "reviews": index_data.get("reviews", []),
         "done": sorted(index_data.get("done", [])),
         "no_text": sorted(index_data.get("no_text", [])),
     }
+
+
+def write_index_json(
+    index_data: dict,
+    index_path: Path = SEARCH_INDEX_JSON,
+    db_path: Path = SEARCH_DB_FILE,
+    rebuild_db: bool = True,
+) -> None:
+    index_path = Path(index_path)
+    db_path = Path(db_path)
+    payload = _normalized_payload(index_data)
     index_path.write_text(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
-    rebuild_search_db(payload, db_path=db_path)
+    if rebuild_db:
+        rebuild_search_db(payload, db_path=db_path)
+
+
+def sync_issue_db(index_data: dict, mag: str, year: str, issue: str, db_path: Path = SEARCH_DB_FILE) -> None:
+    db_path = Path(db_path)
+    conn = connect_search_db(db_path)
+    year = str(year)
+    issue = str(issue).zfill(2)
+    payload = _normalized_payload(index_data)
+    try:
+        conn.execute(
+            "DELETE FROM pages WHERE mag = ? AND year = ? AND issue = ?",
+            (mag, year, issue),
+        )
+        issue_pages = [
+            entry for entry in payload.get("pages", [])
+            if entry["mag"] == mag
+            and str(entry["year"]) == year
+            and str(entry["issue"]).zfill(2) == issue
+        ]
+        if issue_pages:
+            conn.executemany(
+                """
+                INSERT INTO pages (
+                    mag, year, issue, page, text, page_tags_json, is_hidden_search,
+                    search_direct, search_normalized, search_compact
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [_page_row(entry) for entry in issue_pages],
+            )
+        conn.executemany(
+            "INSERT OR REPLACE INTO meta (key, value_json) VALUES (?, ?)",
+            [
+                ("done", _json_dumps(payload.get("done", []))),
+                ("no_text", _json_dumps(payload.get("no_text", []))),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def sync_db_from_json(index_path: Path = SEARCH_INDEX_JSON, db_path: Path = SEARCH_DB_FILE) -> None:

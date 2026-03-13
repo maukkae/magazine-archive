@@ -9,6 +9,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         tesseract-ocr \
         tesseract-ocr-fin \
+        tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 COPY admin/requirements.txt ./requirements.txt

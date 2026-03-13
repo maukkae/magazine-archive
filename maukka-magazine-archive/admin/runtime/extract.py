@@ -30,6 +30,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 from PIL import Image, ImageFilter
 from archive_paths import HTML_FILES, JPG_DIR, MANIFEST_FILE, PDF_DIR, SEARCH_INDEX_FILE
+from ollama_ocr import ollama_enabled_from_env, ocr_pages_with_ollama
 from search_store import read_index_json, write_index_json
 
 # ---------------------------------------------------------------------------
@@ -392,6 +393,7 @@ def _clean_text(text: str) -> str:
     - Remove soft hyphens (PDF line-break artifact)
     - Strip characters outside basic Latin + Latin Extended (0xC0-0x24F),
       which catches garbled OCR symbols while keeping Finnish/European chars
+    - Join hyphenated line-break words like ``kuin -ka`` -> ``kuinka``
     - Collapse whitespace
     """
     text = text.replace('\xad', '')  # soft hyphen
@@ -402,7 +404,13 @@ def _clean_text(text: str) -> str:
             cleaned.append(c)
         else:
             cleaned.append(' ')
-    return ' '.join(''.join(cleaned).split())
+    text = ''.join(cleaned)
+    text = re.sub(
+        r'([A-Za-zÅÄÖåäö]+)\s*-\s+([A-Za-zÅÄÖåäö]+)',
+        r'\1\2',
+        text,
+    )
+    return ' '.join(text.split())
 
 
 def _text_from_tesseract(page_files: list[Path], mag: str, year: str,
@@ -422,7 +430,13 @@ def _text_from_tesseract(page_files: list[Path], mag: str, year: str,
         page_num = int(m.group(1))
         if page_num == 1:
             continue  # skip cover
-        text = _clean_text(pytesseract.image_to_string(Image.open(page_path), lang=lang))
+        try:
+            text = _clean_text(
+                pytesseract.image_to_string(Image.open(page_path), lang=lang)
+            )
+        except (pytesseract.TesseractNotFoundError, FileNotFoundError):
+            print("    tesseract executable not found — skipping image OCR fallback")
+            return []
         if len(text) >= MIN_TEXT_CHARS:
             entries.append({"mag": mag, "year": year, "issue": issue,
                             "page": page_num, "text": text})
@@ -455,6 +469,8 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
     for pdf_path in pdf_files:
         magazine, year, issue = parse_pdf(pdf_path)
         issue_key = f"{magazine}/{year}/{issue}"
+        issue_dir = JPG_DIR / magazine / year / issue
+        page_files = sorted(issue_dir.glob("*_[0-9][0-9][0-9].jpg"))
 
         # Fast skip: already processed (either scanned or fully indexed)
         if issue_key in no_text or issue_key in done:
@@ -469,13 +485,39 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
             len(doc[i].get_text().strip()) >= MIN_TEXT_CHARS
             for i in range(min(10, len(doc)))
         )
+
+        if ollama_enabled_from_env():
+            if has_text:
+                print(f"  {pdf_path.name}: embedded text layer detected — remote Ollama OCR forced by request...")
+            else:
+                print(f"  {pdf_path.name}: no text layer — trying remote Ollama OCR...")
+
+            if page_files:
+                new_entries = ocr_pages_with_ollama(
+                    page_files, magazine, year, issue
+                )
+                if new_entries:
+                    doc.close()
+                    pages.extend(new_entries)
+                    done.add(issue_key)
+                    changed = True
+                    print(f"    {len(new_entries)} page(s) indexed via remote Ollama OCR")
+                    continue
+                print("    no usable text via remote Ollama OCR")
+                if has_text:
+                    print("    falling back to embedded PDF text extraction...")
+                elif not no_tesseract:
+                    print(f"    falling back to tesseract ({tess_lang})...")
+            else:
+                if has_text:
+                    print(f"  {pdf_path.name}: embedded text layer detected — no page JPGs for remote Ollama OCR, using native PDF text extraction")
+                else:
+                    print(f"  {pdf_path.name}: no text layer, no page JPGs for remote Ollama OCR")
+
         if not has_text:
             doc.close()
             if not no_tesseract:
-                issue_dir  = JPG_DIR / magazine / year / issue
-                page_files = sorted(issue_dir.glob("*_[0-9][0-9][0-9].jpg"))
                 if page_files:
-                    print(f"  {pdf_path.name}: no text layer — trying tesseract ({tess_lang})...")
                     new_entries = _text_from_tesseract(
                         page_files, magazine, year, issue, tess_lang)
                     if new_entries:
@@ -493,6 +535,9 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
             no_text.add(issue_key)
             changed = True
             continue
+
+        if not ollama_enabled_from_env():
+            print(f"  {pdf_path.name}: embedded text layer detected — using native PDF text extraction...")
 
         print(f"  {pdf_path.name}: indexing text...")
         new_pages = 0
@@ -514,6 +559,7 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
 
     if changed:
         out = {"pages": pages, "no_text": sorted(no_text), "done": sorted(done)}
+        print("  Saving search index and rebuilding search database...")
         write_index_json(out, index_path=SEARCH_INDEX_FILE)
         print(f"  {SEARCH_INDEX_FILE}: {len(pages)} page(s), "
               f"{len(no_text)} scanned, {len(done)} text issue(s)")

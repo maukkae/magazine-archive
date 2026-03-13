@@ -140,6 +140,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    pointer-events: all;
 }
 .topbar-link:hover { background: #e94560; border-color: #e94560; }
 
@@ -363,6 +364,10 @@
         .thumb-item:hover { border-color: #e94560; transform: scale(1.03); }
         .thumb-item.active-spread { border-color: rgba(233, 69, 96, 0.9); }
         .thumb-item.tagging-mode { cursor: copy; }
+        .thumb-item.tag-saving {
+            border-color: rgba(233, 69, 96, 0.9);
+            box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+        }
         .thumb-item img { display: block; width: 100%; height: auto; pointer-events: none; }
         .thumb-num {
             text-align: center;
@@ -1449,14 +1454,20 @@
         const nextTags = tags.includes(tag)
             ? tags.filter(t => t !== tag)
             : [...tags, tag];
+        pageTagMap.set(pageNum, nextTags);
+        renderThumbTags(item, pageNum);
+        setClass(item, 'tag-saving', true);
         try {
             setTagStatus(`Saving p.${pageNum}...`);
             await savePageTags(pageNum, nextTags);
-            pageTagMap.set(pageNum, nextTags);
             setKnownTags([...knownTags, tag]);
+            setClass(item, 'tag-saving', false);
             renderThumbTags(item, pageNum);
             setTagStatus(nextTags.includes(tag) ? `Tagged p.${pageNum} as ${tag}` : `Removed ${tag} from p.${pageNum}`);
         } catch (err) {
+            pageTagMap.set(pageNum, tags);
+            setClass(item, 'tag-saving', false);
+            renderThumbTags(item, pageNum);
             setTagStatus(`Save failed on p.${pageNum}`, true);
         }
     }

@@ -24,14 +24,11 @@ Usage:
 """
 
 import argparse
-import io
 import json
 import re
 import shutil
 import sys
 from pathlib import Path
-
-from PIL import Image
 
 # Reuse shared helpers from extract.py — no need to duplicate them.
 from extract import (
@@ -40,7 +37,6 @@ from extract import (
     MANIFEST_FILE,
     SEARCH_INDEX_FILE,
     _resize_jpeg,
-    _create_collage,
     _make_thumbnail,
     _clean_text,
     _text_from_tesseract,
@@ -48,6 +44,7 @@ from extract import (
     update_magazines_html,
 )
 from archive_paths import SCAN_DIR
+from ollama_ocr import ollama_enabled_from_env, ocr_pages_with_ollama
 from search_store import read_index_json, write_index_json
 
 PAGE_RE           = re.compile(r"^.+_(\d{4})_(\d{2,})_(\d{3})\.(jpg|jpeg)$", re.IGNORECASE)
@@ -120,20 +117,15 @@ def discover_all_magazines() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — copy pages + cover + collage
+# Stage 1 — copy pages + cover
 # ---------------------------------------------------------------------------
 
 def run_import(issues: list[tuple], cover_height: int) -> None:
     print(f"\n[Stage 1] Importing pages ({len(issues)} issue(s))...")
 
-    cover_images: dict[tuple, list] = {}   # (mag, year) -> [PIL.Image]
-    new_covers:   set[tuple]        = set()
-
     for mag, year, issue, scan_dir in issues:
         pages   = get_page_files(scan_dir)
         out_dir = JPG_DIR / mag / year / issue
-        key     = (mag, year)
-        cover_images.setdefault(key, [])
 
         if not pages:
             print(f"  {mag}/{year}/{issue}: no page JPGs found, skipping")
@@ -142,9 +134,6 @@ def run_import(issues: list[tuple], cover_height: int) -> None:
         # Skip if last expected page already present in output
         if (out_dir / pages[-1].name).exists():
             print(f"  {mag}/{year}/{issue}: already imported ({len(pages)} pages), skipping")
-            cover_jpg = JPG_DIR / mag / year / f"{mag}_{year}_{issue}_cover.jpg"
-            if cover_jpg.exists():
-                cover_images[key].append(Image.open(cover_jpg))
             continue
 
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -161,18 +150,6 @@ def run_import(issues: list[tuple], cover_height: int) -> None:
             data = _resize_jpeg(pages[0].read_bytes(), cover_height)
             cover_dst.write_bytes(data)
             print(f"    cover -> {cover_dst.name}")
-        cover_images[key].append(Image.open(cover_dst))
-        new_covers.add(key)
-
-    # Collages — only rebuild if at least one new cover was added for that year
-    print("  Creating collages...")
-    for (mag, year), imgs in sorted(cover_images.items()):
-        collage_path = JPG_DIR / mag / f"collage_{year}.jpg"
-        if (mag, year) not in new_covers and collage_path.exists():
-            print(f"    collage_{year}.jpg: exists, skipping")
-            continue
-        if imgs:
-            _create_collage(imgs, collage_path)
 
 
 # ---------------------------------------------------------------------------
@@ -258,8 +235,15 @@ def run_text_index(issues: list[tuple], tess_lang: str) -> None:
             print(f"  {key}: companion PDF found ({companion.name}), extracting text...")
             new_entries = _text_from_pdf(companion, mag, year, issue)
         else:
-            print(f"  {key}: no companion PDF — running tesseract ({tess_lang})...")
-            new_entries = _text_from_tesseract(scan_pages, mag, year, issue, tess_lang)
+            new_entries = []
+            if ollama_enabled_from_env():
+                print(f"  {key}: no companion PDF — running remote Ollama OCR...")
+                new_entries = ocr_pages_with_ollama(scan_pages, mag, year, issue)
+                if not new_entries:
+                    print("    no usable text via remote Ollama OCR")
+            if not new_entries:
+                print(f"  {key}: no companion PDF — running tesseract ({tess_lang})...")
+                new_entries = _text_from_tesseract(scan_pages, mag, year, issue, tess_lang)
 
         if new_entries:
             pages.extend(new_entries)
@@ -272,6 +256,7 @@ def run_text_index(issues: list[tuple], tess_lang: str) -> None:
 
     if changed:
         out = {"pages": pages, "no_text": sorted(no_text), "done": sorted(done)}
+        print("    Saving search index and rebuilding search database...")
         write_index_json(out, index_path=SEARCH_INDEX_FILE)
         print(f"  {SEARCH_INDEX_FILE}: {len(pages)} page(s) total, "
               f"{len(done)} indexed, {len(no_text)} no-text")
@@ -337,7 +322,12 @@ def main() -> None:
     for mag, year, issue, scan_dir in issues:
         pages     = get_page_files(scan_dir)
         companion = find_companion_pdf(scan_dir)
-        ocr_note  = f" + OCR PDF ({companion.name})" if companion else " (tesseract fallback)"
+        if companion:
+            ocr_note = f" + OCR PDF ({companion.name})"
+        elif ollama_enabled_from_env():
+            ocr_note = " (remote Ollama OCR)"
+        else:
+            ocr_note = " (tesseract fallback)"
         print(f"  {mag}/{year}/{issue}: {len(pages)} page(s){ocr_note}")
 
     # Stage 1 — copy pages, cover, collage (creates jpg/ dirs first)
