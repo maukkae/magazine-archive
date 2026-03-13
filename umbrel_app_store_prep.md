@@ -152,3 +152,38 @@ Then copy the draft files from:
 - [umbrel_app_store_draft](E:\claude_projects\pelit_cover_sheets\umbrel_app_store_draft)
 
 and replace the template app with the real app package.
+
+## Current tested status
+
+This is no longer just a draft.
+
+Confirmed working pieces:
+
+- the community app store repo can be added to Umbrel
+- the app installs from the custom store
+- GHCR-backed images work
+- the app icon renders in the Umbrel launcher
+- the app runs after reseeding content into its app-data directory
+
+Confirmed caveat:
+
+- uninstalling the app wipes its app data
+
+So the practical deployment model is:
+
+- install the app shell
+- reseed content afterward
+
+Current live app-data path on Umbrel:
+
+```text
+/home/umbrel/umbrel/app-data/maukka-magazine-archive/site
+```
+
+Current reseed helper:
+
+- [umbrel/reseed_app_data.sh](E:\claude_projects\pelit_cover_sheets\umbrel\reseed_app_data.sh)
+
+## Next major app-store task
+
+Add the admin/upload workflow to the app package so the installed app can be populated and maintained without manual host-side copying.

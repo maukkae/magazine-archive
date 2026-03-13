@@ -11,12 +11,15 @@ Current structure:
   - `init` seeding container
   - `viewer` nginx container
   - `search` Python/Flask container
+  - `admin` Python/Flask container for uploads and archive management
 - `seed/site/`
   - empty archive shell with static site files, empty metadata, and empty search DB
 - `viewer/`
   - nginx config that proxies `/api/` to the `search` service
 - `search/`
   - containerized search API using `search_server.py`
+- `admin/`
+  - containerized admin panel and upload pipeline
 - `init/`
   - first-run seeding logic for `${APP_DATA_DIR}/site`
 
@@ -35,6 +38,7 @@ Container images expected by this draft:
 - `ghcr.io/maukkae/magazine-archive-init:latest`
 - `ghcr.io/maukkae/magazine-archive-viewer:latest`
 - `ghcr.io/maukkae/magazine-archive-search:latest`
+- `ghcr.io/maukkae/magazine-archive-admin:latest`
 
 Those images are meant to be published automatically from GitHub Actions via:
 

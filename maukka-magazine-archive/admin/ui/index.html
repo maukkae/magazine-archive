@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Magazine Archive</title>
+<style>
+:root {
+    --bg: #0d0d1a;
+    --bg-soft: #141a33;
+    --panel: rgba(22, 33, 62, 0.84);
+    --panel-strong: rgba(17, 24, 39, 0.92);
+    --line: rgba(88, 128, 198, 0.28);
+    --line-strong: rgba(233, 69, 96, 0.36);
+    --text: #f3f6ff;
+    --muted: #93a3c7;
+    --soft: #667391;
+    --accent: #e94560;
+    --accent-soft: rgba(233, 69, 96, 0.18);
+    --blue: #0f3460;
+    --ok: #4caf7d;
+    --warn: #e0a020;
+    --error: #ff6b81;
+    --shadow: 0 20px 80px rgba(0, 0, 0, 0.45);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: Arial, sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 220px;
+    background:
+        radial-gradient(circle at top left, rgba(17, 55, 107, 0.38), transparent 32%),
+        radial-gradient(circle at top right, rgba(233, 69, 96, 0.16), transparent 26%),
+        linear-gradient(180deg, #11162d 0%, #0d0d1a 42%, #090914 100%);
+}
+
+#topBar {
+    position: sticky;
+    top: 0;
+    z-index: 120;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 24px;
+    background: linear-gradient(to bottom, rgba(13,13,26,0.96) 0%, rgba(13,13,26,0.8) 100%);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    flex-shrink: 0;
+}
+#topBar .title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 2px;
+}
+#topBar .subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    flex: 1;
+}
+#topBar button {
+    background: rgba(15, 52, 96, 0.7);
+    border: 1px solid rgba(233, 69, 96, 0.34);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+#topBar button:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+#nav {
+    display: flex;
+    gap: 6px;
+    padding: 14px 24px 0;
+    background: linear-gradient(to bottom, rgba(13,13,26,0.86), transparent);
+}
+.tab-btn {
+    background: rgba(22, 33, 62, 0.66);
+    border: 1px solid transparent;
+    color: var(--soft);
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 12px 12px 0 0;
+    transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+.tab-btn:hover { color: var(--text); border-color: rgba(233, 69, 96, 0.2); }
+.tab-btn.active {
+    color: var(--accent);
+    background: rgba(22, 33, 62, 0.92);
+    border-color: var(--line);
+    border-bottom-color: transparent;
+}
+
+#content {
+    flex: 1;
+    padding: 24px;
+    max-width: 1260px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Magazine list */
+.mag-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+.mag-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 18px;
+    cursor: pointer;
+    gap: 12px;
+    user-select: none;
+}
+.mag-header:hover { background: rgba(255,255,255,0.03); }
+.mag-name { font-weight: bold; font-size: 15px; color: var(--accent); flex: 0 0 auto; }
+.mag-stats { font-size: 13px; color: var(--muted); flex: 1; }
+.mag-chevron { color: var(--soft); font-size: 12px; transition: transform 0.2s; }
+.mag-header.open .mag-chevron { transform: rotate(180deg); }
+
+.mag-body { display: none; border-top: 1px solid var(--line); }
+.mag-body.open { display: block; }
+
+.year-section { padding: 0 16px 8px; }
+.year-heading {
+    font-size: 13px; font-weight: bold; color: var(--muted);
+    padding: 12px 0 7px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 4px;
+}
+
+.issue-row {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+    gap: 10px;
+    font-size: 13px;
+}
+.issue-id { color: var(--text); width: 50px; flex-shrink: 0; }
+.issue-meta { color: var(--muted); flex: 1; }
+.badge {
+    font-size: 11px; padding: 2px 6px; border-radius: 4px;
+    font-weight: bold; flex-shrink: 0;
+}
+.badge-ok  { background: rgba(76, 175, 125, 0.16); color: var(--ok); }
+.badge-no  { background: rgba(233, 69, 96, 0.16); color: var(--error); }
+.badge-nil { background: rgba(255,255,255,0.08); color: var(--muted); }
+
+.mag-actions {
+    display: flex; gap: 8px; padding: 12px 16px;
+    border-top: 1px solid var(--line); background: rgba(10, 14, 28, 0.55);
+}
+
+/* Buttons */
+.btn {
+    border: none; border-radius: 999px; padding: 8px 16px;
+    font-size: 13px; cursor: pointer; font-weight: bold;
+    transition: transform 0.18s, filter 0.18s, background 0.18s, border-color 0.18s;
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.btn-danger   { background: rgba(122, 26, 42, 0.92); color: #fff; }
+.btn-danger:hover { background: var(--accent); }
+.btn-warn     { background: rgba(90, 64, 16, 0.94); color: #ffd076; }
+.btn-warn:hover { background: #7a5615; }
+.btn-primary  { background: rgba(15, 52, 96, 0.92); color: #fff; }
+.btn-primary:hover { background: #1a4a80; }
+.btn-ghost    { background: rgba(15, 52, 96, 0.28); border: 1px solid var(--line); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--line-strong); color: #fff; }
+
+.btn-sm { padding: 4px 8px; font-size: 12px; }
+
+/* Confirm pattern */
+.confirm-wrap { display: inline-flex; gap: 4px; align-items: center; }
+
+/* Upload forms */
+.upload-tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+.upload-tab {
+    background: none; border: 1px solid #0f3460; color: #888;
+    border-radius: 6px; padding: 8px 18px; cursor: pointer; font-size: 14px;
+}
+.upload-tab.active { background: #0f3460; color: #fff; }
+
+/* Crop checkbox */
+.crop-option {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px; padding: 10px 14px;
+    background: var(--panel-strong); border: 1px solid var(--line); border-radius: 12px;
+    cursor: pointer; user-select: none;
+}
+.crop-option:hover { border-color: rgba(233, 69, 96, 0.25); }
+.crop-option input[type=checkbox] { width: 16px; height: 16px; accent-color: #e94560; cursor: pointer; }
+.crop-option-label { font-size: 13px; color: var(--text); }
+.crop-option-hint  { font-size: 11px; color: var(--soft); margin-top: 2px; }
+
+/* PDF drop zone */
+#pdf-drop-zone {
+    border: 2px dashed var(--line); border-radius: 18px;
+    padding: 32px 20px; text-align: center; cursor: pointer;
+    color: var(--soft); font-size: 14px; margin-bottom: 14px;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+    background: rgba(17, 24, 39, 0.35);
+}
+#pdf-drop-zone:hover { border-color: rgba(233, 69, 96, 0.32); color: var(--muted); }
+#pdf-drop-zone.drag-over {
+    border-color: var(--accent); background: rgba(76, 14, 34, 0.45); color: var(--text);
+}
+#pdf-drop-zone .drop-icon { font-size: 28px; margin-bottom: 8px; }
+#pdf-drop-zone .drop-sub  { font-size: 12px; color: var(--soft); margin-top: 4px; }
+#pdf-drop-zone.drag-over .drop-sub { color: var(--muted); }
+
+/* PDF queue list */
+#pdf-queue { margin: 0 0 16px; }
+.pdf-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel-strong); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 11px; margin-bottom: 6px;
+    font-size: 13px;
+}
+.pdf-item.status-done  { border-color: rgba(76, 175, 125, 0.4); }
+.pdf-item.status-error { border-color: rgba(233, 69, 96, 0.5); }
+.pdf-item.status-running { border-color: rgba(56, 145, 255, 0.48); animation: pulse-border 1s ease-in-out infinite; }
+@keyframes pulse-border { 0%,100% { border-color: rgba(56, 145, 255, 0.48); } 50% { border-color: rgba(233, 69, 96, 0.55); } }
+.pdf-item-name { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pdf-item-fields { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.pdf-item-fields label { font-size: 11px; color: var(--soft); }
+.pdf-field {
+    background: rgba(22, 33, 62, 0.85); border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 4px 7px; font-size: 12px; outline: none;
+}
+.pdf-field:focus { border-color: var(--accent); color: #fff; }
+.pdf-field.year  { width: 46px; }
+.pdf-field.issue { width: 36px; }
+.pdf-status {
+    font-size: 11px; font-weight: bold; flex-shrink: 0; width: 54px; text-align: right;
+}
+.pdf-status.pending  { color: var(--soft); }
+.pdf-status.running  { color: #6aacff; }
+.pdf-status.done     { color: var(--ok); }
+.pdf-status.error    { color: var(--error); }
+.pdf-remove { background: none; border: none; color: var(--soft); cursor: pointer; font-size: 14px; padding: 0 2px; flex-shrink: 0; }
+.pdf-remove:hover { color: var(--accent); }
+
+.upload-pane { display: none; }
+.upload-pane.active { display: block; }
+
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; color: #888; margin-bottom: 5px; }
+.form-group input[type=text], .form-group input[type=number] {
+    background: rgba(17, 24, 39, 0.88); border: 1px solid var(--line); color: #fff;
+    border-radius: 12px; padding: 10px 14px; font-size: 14px; width: 200px; outline: none;
+}
+.form-group input:focus { border-color: var(--accent); }
+
+.detected { font-size: 12px; color: var(--ok); margin-top: 4px; }
+.detected.warn { color: var(--warn); }
+
+.file-pick-btn {
+    background: rgba(15, 52, 96, 0.34); border: 1px dashed var(--line); color: var(--muted);
+    border-radius: 12px; padding: 10px 16px; cursor: pointer; font-size: 13px;
+    display: inline-block;
+}
+.file-pick-btn:hover { border-color: var(--accent); color: #fff; }
+
+/* File list for scans */
+#file-list { margin: 10px 0; }
+.file-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel-strong); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 12px; margin-bottom: 6px;
+    cursor: grab;
+}
+.file-item.dragging { opacity: 0.4; }
+.file-item.drag-over { border-color: var(--accent); }
+.file-handle { color: var(--soft); font-size: 16px; cursor: grab; user-select: none; }
+.file-orig { font-size: 13px; color: var(--muted); flex: 1; }
+.file-dest { font-size: 12px; color: var(--ok); flex-shrink: 0; }
+.file-remove { background: none; border: none; color: var(--soft); cursor: pointer; font-size: 14px; }
+.file-remove:hover { color: var(--accent); }
+
+/* Tools */
+.tool-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 16px;
+    box-shadow: var(--shadow);
+}
+.tool-desc { flex: 1; font-size: 13px; color: var(--muted); }
+.tool-title { font-size: 14px; color: var(--text); font-weight: bold; margin-bottom: 4px; }
+
+/* Log panel */
+#log-panel {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(13, 13, 26, 0.94); border-top: 1px solid var(--line);
+    height: 200px; display: flex; flex-direction: column; z-index: 100;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+#log-header {
+    display: flex; align-items: center; padding: 6px 12px; gap: 8px;
+    background: rgba(22, 33, 62, 0.84); border-bottom: 1px solid var(--line); flex-shrink: 0;
+}
+#log-header span { font-size: 12px; font-weight: bold; color: var(--accent); flex: 1; }
+#log-header button {
+    background: none; border: 1px solid var(--line); color: var(--soft);
+    border-radius: 999px; padding: 2px 8px; cursor: pointer; font-size: 11px;
+}
+#log-header button:hover { color: #fff; }
+#log-body {
+    flex: 1; overflow-y: auto; padding: 8px 12px;
+    font-family: monospace; font-size: 12px; line-height: 1.6;
+}
+.log-line { color: #888; }
+.log-line.done  { color: #4caf7d; font-weight: bold; }
+.log-line.error { color: #e94560; font-weight: bold; }
+
+/* OCR Review panel */
+#review-panel {
+    position: fixed; top: 0; right: 0; bottom: 200px;
+    width: min(1180px, 90vw); background: rgba(20, 26, 51, 0.96);
+    border-left: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 150;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+#review-panel.open { transform: translateX(0); }
+
+#review-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    background: rgba(15, 18, 33, 0.76); flex-shrink: 0;
+}
+#review-title { flex: 1; font-size: 14px; font-weight: bold; color: var(--accent); }
+#review-summary {
+    padding: 12px 18px; font-size: 12px; color: var(--muted);
+    border-bottom: 1px solid var(--line); flex-shrink: 0;
+    display: flex; gap: 20px;
+}
+#review-summary span { color: var(--text); }
+#review-body {
+    flex: 1; min-height: 0; display: flex;
+}
+
+.review-sidebar {
+    width: 230px; flex-shrink: 0; min-width: 0;
+    border-right: 1px solid var(--line);
+    background: rgba(12, 17, 32, 0.7);
+    overflow-y: auto;
+}
+.review-page-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+}
+.review-page-item:hover { background: rgba(22, 33, 62, 0.66); }
+.review-page-item.active { background: rgba(27, 42, 76, 0.92); }
+.review-page-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+}
+.review-page-num-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.review-page-num  { font-size: 12px; font-weight: bold; color: var(--text); }
+.review-chars     { font-size: 12px; color: var(--muted); flex: 1; }
+.review-bar-wrap  { width: 80px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; }
+.review-bar       { height: 100%; border-radius: 3px; }
+.bar-high   { background: #4caf7d; }
+.bar-mid    { background: #e0a020; }
+.bar-low    { background: #e94560; }
+.review-snippet {
+    font-size: 11px; line-height: 1.45; color: var(--soft);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.review-page-flags {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+.review-flag {
+    font-size: 10px;
+    font-weight: bold;
+    color: #ff8b8b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.review-flag-inline {
+    font-size: 10px;
+    font-weight: bold;
+    color: #ff8b8b;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+}
+
+.review-reader {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    background: rgba(10, 12, 24, 0.92);
+}
+.review-reader-toolbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(15, 18, 33, 0.76);
+}
+.review-reader-title {
+    font-size: 13px; font-weight: bold; color: var(--text);
+    min-width: 60px;
+}
+.review-reader-meta { font-size: 12px; color: var(--muted); flex: 1; }
+.review-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    vertical-align: middle;
+}
+.review-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e94560;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.2px;
+    line-height: 1.4;
+}
+.review-reader-actions {
+    display: flex; align-items: center; gap: 6px;
+}
+.review-empty {
+    padding: 22px; color: var(--muted); font-size: 13px;
+}
+
+.review-page-text {
+    width: 100%; flex: 1; min-height: 0; padding: 14px 16px;
+    font-family: monospace; font-size: 13px; line-height: 1.7;
+    color: #f0f3ff; white-space: pre-wrap; word-break: break-word;
+    background: transparent; border: none; outline: none; resize: vertical;
+    resize: none;
+}
+.review-page-text:focus { color: #f0f3ff; }
+.review-page-text.dirty { background: rgba(76, 175, 125, 0.12); }
+
+.review-page-footer {
+    display: flex; justify-content: flex-end; gap: 6px;
+    padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06);
+    background: rgba(15, 18, 33, 0.76);
+}
+.save-indicator { font-size: 11px; align-self: center; color: #4caf7d; display: none; }
+
+/* Toast */
+#toast {
+    position: fixed; top: 70px; right: 20px;
+    background: rgba(22, 33, 62, 0.92); border: 1px solid var(--line);
+    color: #fff; border-radius: 14px; padding: 12px 16px;
+    font-size: 13px; z-index: 200; display: none; max-width: 300px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+#toast.ok    { border-color: var(--ok); color: var(--ok); }
+#toast.error { border-color: var(--error); color: var(--error); }
+
+#loading { color: var(--muted); font-size: 14px; padding: 20px 0; }
+</style>
+</head>
+<body>
+
+<div id="topBar">
+    <span class="title">ADMIN</span>
+    <span class="subtitle">Magazine Archive</span>
+    <button onclick="loadMagazines()">↺ Refresh</button>
+</div>
+
+<div id="nav">
+    <button class="tab-btn active" data-tab="magazines">Magazines</button>
+    <button class="tab-btn" data-tab="upload">Upload</button>
+    <button class="tab-btn" data-tab="tools">Tools</button>
+</div>
+
+<div id="content">
+
+    <!-- MAGAZINES TAB -->
+    <div id="tab-magazines" class="tab-pane active">
+        <div id="mag-list"><div id="loading">Loading...</div></div>
+    </div>
+
+    <!-- UPLOAD TAB -->
+    <div id="tab-upload" class="tab-pane">
+        <div class="upload-tabs">
+            <button class="upload-tab active" data-upload="pdf">PDF</button>
+            <button class="upload-tab" data-upload="scans">Scans (JPG)</button>
+        </div>
+
+        <!-- PDF upload -->
+        <div id="upload-pdf" class="upload-pane active">
+            <div id="pdf-drop-zone">
+                <input type="file" id="pdf-file" accept=".pdf" multiple style="display:none">
+                <div class="drop-icon">&#128196;</div>
+                Drop PDF(s) here or <u>click to browse</u>
+                <div class="drop-sub">You can drop multiple files at once</div>
+            </div>
+            <div id="pdf-queue"></div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+                <div class="form-group" style="margin-bottom:0">
+                    <label>Magazine</label>
+                    <input type="text" id="pdf-mag" placeholder="e.g. Pelit">
+                </div>
+                <label class="crop-option" style="margin-bottom:0; align-self:flex-end;">
+                    <input type="checkbox" id="pdf-crop">
+                    <div>
+                        <div class="crop-option-label">Crop print margins (TrimBox)</div>
+                        <div class="crop-option-hint">For press-ready PDFs with bleed margins. Original kept as _print.pdf.</div>
+                    </div>
+                </label>
+            </div>
+            <label class="crop-option" style="margin-top:10px;">
+                <input type="checkbox" id="pdf-sharpen" onchange="toggleSharpenOptions()">
+                <div>
+                    <div class="crop-option-label">Sharpen text (unsharp mask)</div>
+                    <div class="crop-option-hint">For scanned issues with thin or soft text. Applied to covers and pages.</div>
+                </div>
+            </label>
+            <div id="sharpen-options" style="display:none; padding:8px 14px 2px; margin-top:-6px;
+                 background:#0d0d1a; border: 1px solid #0f3460; border-top:none; border-radius:0 0 6px 6px;">
+                <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Radius</label>
+                        <input type="text" id="sharpen-radius" value="0.3" style="width:70px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Percent <span style="color:#444;font-size:11px;">(PIL scale, default 80)</span></label>
+                        <input type="text" id="sharpen-percent" value="250" style="width:70px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Threshold <span style="color:#444;font-size:11px;">(noise guard, default 3)</span></label>
+                        <input type="text" id="sharpen-threshold" value="3" style="width:70px;">
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                <button class="btn btn-primary" id="pdf-upload-btn" onclick="uploadPdfQueue()" disabled>Upload &amp; Extract</button>
+                <span id="pdf-queue-count" style="font-size:13px;color:#555;margin-left:10px;"></span>
+            </div>
+        </div>
+
+        <!-- Scans upload -->
+        <div id="upload-scans" class="upload-pane">
+            <div class="form-group">
+                <label>Page JPEGs</label>
+                <label class="file-pick-btn">
+                    Choose JPEGs…
+                    <input type="file" id="scan-files" accept=".jpg,.jpeg" multiple style="display:none">
+                </label>
+                <div id="scan-detected" class="detected" style="display:none"></div>
+            </div>
+            <div id="file-list"></div>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div class="form-group">
+                    <label>Magazine</label>
+                    <input type="text" id="scan-mag" placeholder="e.g. TM">
+                </div>
+                <div class="form-group">
+                    <label>Year</label>
+                    <input type="text" id="scan-year" placeholder="2014" maxlength="4">
+                </div>
+                <div class="form-group">
+                    <label>Issue</label>
+                    <input type="text" id="scan-issue" placeholder="10" maxlength="4">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Companion OCR PDF (optional)</label>
+                <label class="file-pick-btn">
+                    Choose PDF…
+                    <input type="file" id="ocr-pdf" accept=".pdf" style="display:none">
+                </label>
+                <div id="ocr-detected" class="detected" style="display:none"></div>
+            </div>
+            <button class="btn btn-primary" onclick="uploadScans()">Upload &amp; Import</button>
+        </div>
+    </div>
+
+    <!-- TOOLS TAB -->
+    <div id="tab-tools" class="tab-pane">
+        <div class="tool-card">
+            <div class="tool-desc">
+                <div class="tool-title">Rebuild manifest.json</div>
+                Regenerates the issue/page index from the jpg/ directory.
+                Run after any manual file changes.
+            </div>
+            <button class="btn btn-primary" onclick="rebuildManifest()">Rebuild</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- OCR REVIEW PANEL -->
+<div id="review-panel">
+    <div id="review-header">
+        <span id="review-title">OCR Review</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeReview()">✕ Close</button>
+    </div>
+    <div id="review-summary">
+        <div>Pages: <span id="rv-pages">—</span></div>
+        <div>Avg chars/page: <span id="rv-avg">—</span></div>
+        <div>Total chars: <span id="rv-total">—</span></div>
+    </div>
+    <div id="review-body">
+        <div id="review-sidebar" class="review-sidebar"></div>
+        <div id="review-reader" class="review-reader"></div>
+    </div>
+</div>
+
+<!-- LOG PANEL -->
+<div id="log-panel">
+    <div id="log-header">
+        <span>LOG</span>
+        <button onclick="clearLog()">Clear</button>
+    </div>
+    <div id="log-body"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Tab navigation
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+
+document.querySelectorAll('.upload-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.upload-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.upload-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('upload-' + btn.dataset.upload).classList.add('active');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Log panel
+// ---------------------------------------------------------------------------
+function logLine(text, cls = '') {
+    const body = document.getElementById('log-body');
+    const div = document.createElement('div');
+    div.className = 'log-line' + (cls ? ' ' + cls : '');
+    div.textContent = text;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+}
+function clearLog() { document.getElementById('log-body').innerHTML = ''; }
+
+// ---------------------------------------------------------------------------
+// Toast
+// ---------------------------------------------------------------------------
+let toastTimer;
+function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+const EMBEDDED_APP_ADMIN = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+const API_BASE = EMBEDDED_APP_ADMIN ? '/admin-api' : '/api';
+
+function apiUrl(path) {
+    return `${API_BASE}${path}`;
+}
+
+// ---------------------------------------------------------------------------
+// SSE job streaming
+// ---------------------------------------------------------------------------
+function streamJob(jobId, onDone, onError) {
+    logLine(`--- job ${jobId.slice(0, 8)} started ---`);
+    const es = new EventSource(apiUrl(`/stream/${jobId}`));
+    es.onmessage = e => {
+        if (e.data === '__done__') {
+            es.close();
+            logLine('--- done ---', 'done');
+            if (onDone) onDone();
+        } else {
+            logLine(JSON.parse(e.data));
+        }
+    };
+    es.onerror = () => {
+        es.close();
+        logLine('Stream error — check server.', 'error');
+        if (onError) onError();
+    };
+}
+
+function viewerBaseUrl() {
+    const url = new URL(window.location.href);
+    if (window.location.port === '8001') {
+        url.port = '8000';
+    }
+    url.pathname = '/viewer.html';
+    url.search = '';
+    return url.toString();
+}
+
+function openViewer(mag, year, issue, page = 1) {
+    const url = new URL(viewerBaseUrl());
+    url.searchParams.set('mag', mag);
+    url.searchParams.set('year', year);
+    url.searchParams.set('issue', String(issue).padStart(2, '0'));
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('adminApi', EMBEDDED_APP_ADMIN ? `${window.location.origin}/admin-api` : window.location.origin);
+    url.searchParams.set('grid', '1');
+    url.searchParams.set('tagging', '1');
+    window.open(url.toString(), '_blank', 'noopener');
+}
+
+// ---------------------------------------------------------------------------
+// Magazine list
+// ---------------------------------------------------------------------------
+async function loadMagazines() {
+    document.getElementById('mag-list').innerHTML = '<div id="loading">Loading...</div>';
+    const data = await fetch(apiUrl('/magazines')).then(r => r.json());
+    const list = document.getElementById('mag-list');
+    list.innerHTML = '';
+    if (!data.length) { list.innerHTML = '<div id="loading">No magazines found in jpg/</div>'; return; }
+    data.forEach(m => list.appendChild(buildMagCard(m)));
+}
+
+function buildMagCard(m) {
+    const card = document.createElement('div');
+    card.className = 'mag-card';
+
+    const header = document.createElement('div');
+    header.className = 'mag-header';
+    header.innerHTML = `
+        <span class="mag-name">${m.mag}</span>
+        <span class="mag-stats">${m.total_issues} issue${m.total_issues !== 1 ? 's' : ''} &middot; ${m.total_pages} pages indexed</span>
+        <span class="mag-chevron">▾</span>`;
+    header.addEventListener('click', () => {
+        header.classList.toggle('open');
+        body.classList.toggle('open');
+    });
+
+    const body = document.createElement('div');
+    body.className = 'mag-body';
+
+    m.years.forEach(y => {
+        const ys = document.createElement('div');
+        ys.className = 'year-section';
+        ys.innerHTML = `<div class="year-heading">${y.year}</div>`;
+        y.issues.forEach(iss => {
+            const row = document.createElement('div');
+            row.className = 'issue-row';
+            const badge = iss.indexed
+                ? `<span class="badge badge-ok">indexed ${iss.index_pages}p</span>`
+                : iss.no_text
+                ? `<span class="badge badge-no">no text</span>`
+                : `<span class="badge badge-nil">not indexed</span>`;
+            row.innerHTML = `
+                <span class="issue-id">${iss.issue}</span>
+                <span class="issue-meta">${iss.pages} pages</span>
+                ${badge}`;
+            row.appendChild(makeIssueActions(m.mag, y.year, iss.issue, iss.indexed));
+            ys.appendChild(row);
+        });
+        body.appendChild(ys);
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'mag-actions';
+    actions.appendChild(confirmBtn('Remove magazine', 'btn btn-danger btn-sm',
+        'Delete JPG pages and indexed OCR for this whole magazine?',
+        () => removeMagazine(m.mag)));
+    actions.appendChild(confirmBtn('Clear index', 'btn btn-warn btn-sm',
+        'Delete indexed OCR text only? Magazine files stay on disk.',
+        () => clearIndex({ mag: m.mag })));
+    body.appendChild(actions);
+
+    card.appendChild(header);
+    card.appendChild(body);
+    return card;
+}
+
+function makeIssueActions(mag, year, issue, indexed) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;';
+    if (indexed) {
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'btn btn-primary btn-sm';
+        viewBtn.textContent = 'Open Viewer';
+        viewBtn.addEventListener('click', () => openViewer(mag, year, issue, 1));
+        wrap.appendChild(viewBtn);
+
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-ghost btn-sm';
+        btn.textContent = 'Review OCR';
+        btn.addEventListener('click', () => openReview(mag, year, issue));
+        wrap.appendChild(btn);
+    }
+    wrap.appendChild(confirmBtn('Remove', 'btn btn-danger btn-sm',
+        'Delete this issue and its extracted JPG pages from the server?',
+        () => removeIssue(mag, year, issue)));
+    wrap.appendChild(confirmBtn('Clear index', 'btn btn-warn btn-sm',
+        'Delete indexed OCR text only? Issue files stay on disk.',
+        () => clearIndex({ mag, year, issue })));
+    return wrap;
+}
+
+function confirmBtn(label, cls, confirmLabel, action) {
+    const btn = document.createElement('button');
+    btn.className = cls;
+    btn.textContent = label;
+    let pending = false;
+    btn.addEventListener('click', () => {
+        if (!pending) {
+            pending = true;
+            btn.textContent = confirmLabel;
+            btn.style.opacity = '0.7';
+            setTimeout(() => { pending = false; btn.textContent = label; btn.style.opacity = ''; }, 3000);
+        } else {
+            action();
+        }
+    });
+    return btn;
+}
+
+async function removeMagazine(mag) {
+    logLine(`Removing magazine ${mag}…`);
+    const r = await fetch(apiUrl('/remove/magazine'), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ mag }),
+    }).then(r => r.json());
+    if (r.ok) { toast(`${mag} removed`); loadMagazines(); }
+    else toast(r.error || 'Error', 'error');
+}
+
+async function removeIssue(mag, year, issue) {
+    logLine(`Removing ${mag}/${year}/${issue}…`);
+    const r = await fetch(apiUrl('/remove/issue'), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ mag, year, issue }),
+    }).then(r => r.json());
+    if (r.ok) { toast(`${mag} ${issue}/${year} removed`); loadMagazines(); }
+    else toast(r.error || 'Error', 'error');
+}
+
+async function clearIndex(params) {
+    const label = params.issue
+        ? `${params.mag}/${params.year}/${params.issue}`
+        : params.mag;
+    logLine(`Clearing index for ${label}…`);
+    const r = await fetch(apiUrl('/clear-index'), {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(params),
+    }).then(r => r.json());
+    if (r.ok) { toast(`Index cleared for ${label}`); loadMagazines(); }
+    else toast(r.error || 'Error', 'error');
+}
+
+// ---------------------------------------------------------------------------
+// Filename auto-detection
+// ---------------------------------------------------------------------------
+function parseFilename(name) {
+    // Scan JPG: Mag_YYYY_MM_NNN.jpg
+    let m = name.match(/^(.+)_(\d{4})_(\d{2,})_\d{3}\.jpe?g$/i);
+    if (m) return { mag: m[1], year: m[2], issue: m[3] };
+    // PDF: Mag_YYYY_MM.pdf or Mag_YYYY_MM_print.pdf
+    m = name.match(/^(.+)_(\d{4})_(\d{2,})(?:_print)?\.pdf$/i);
+    if (m) return { mag: m[1], year: m[2], issue: m[3] };
+    // PDF: Mag_MM_YYYY.pdf or Mag_MM_YYYY_print.pdf (print-house naming, flipped date)
+    m = name.match(/^(.+)_(\d{2})_(\d{4})(?:_print)?\.pdf$/i);
+    if (m) return { mag: m[1], year: m[3], issue: m[2] };
+    // PDF: Mag_YYYY.pdf
+    m = name.match(/^(.+)_(\d{4})\.pdf$/i);
+    if (m) return { mag: m[1], year: m[2], issue: '01' };
+    return null;
+}
+
+function applyDetected(parsed, magEl, yearEl, issueEl, infoEl) {
+    if (parsed) {
+        magEl.value   = parsed.mag;
+        yearEl.value  = parsed.year;
+        issueEl.value = parsed.issue;
+        infoEl.textContent = `Detected: ${parsed.mag} ${parsed.issue}/${parsed.year}`;
+        infoEl.className = 'detected';
+        infoEl.style.display = 'block';
+    } else {
+        infoEl.textContent = 'Could not detect Magazine/Year/Issue from filename — fill in manually.';
+        infoEl.className = 'detected warn';
+        infoEl.style.display = 'block';
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PDF queue
+// ---------------------------------------------------------------------------
+let pdfQueue = [];   // [{file, year, issue, status:'pending'|'running'|'done'|'error'}]
+
+function pdfQueueChanged() {
+    const btn = document.getElementById('pdf-upload-btn');
+    const ctr = document.getElementById('pdf-queue-count');
+    const pending = pdfQueue.filter(i => i.status === 'pending').length;
+    btn.disabled = pending === 0;
+    ctr.textContent = pdfQueue.length
+        ? `${pending} pending, ${pdfQueue.length} total`
+        : '';
+}
+
+function renderPdfQueue() {
+    const list = document.getElementById('pdf-queue');
+    list.innerHTML = '';
+    pdfQueue.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = `pdf-item${item.status !== 'pending' ? ' status-' + item.status : ''}`;
+        row.id = `pdf-item-${idx}`;
+
+        const name = document.createElement('span');
+        name.className = 'pdf-item-name';
+        name.title = item.file.name;
+        name.textContent = item.file.name;
+
+        const fields = document.createElement('div');
+        fields.className = 'pdf-item-fields';
+        fields.innerHTML = `
+            <label>Year</label>
+            <input class="pdf-field year" value="${item.year}" maxlength="4"
+                   onchange="pdfQueue[${idx}].year=this.value.trim()">
+            <label>Issue</label>
+            <input class="pdf-field issue" value="${item.issue}" maxlength="4"
+                   onchange="pdfQueue[${idx}].issue=this.value.trim()">`;
+
+        const status = document.createElement('span');
+        status.id = `pdf-status-${idx}`;
+        const labels = { pending: 'pending', running: 'uploading', done: 'done', error: 'error' };
+        status.className = `pdf-status ${item.status}`;
+        status.textContent = labels[item.status] || item.status;
+
+        // Lock fields for already-processed items
+        if (item.status !== 'pending') {
+            fields.querySelectorAll('input').forEach(i => i.disabled = true);
+        }
+
+        const rm = document.createElement('button');
+        rm.className = 'pdf-remove';
+        rm.title = 'Remove';
+        rm.textContent = '✕';
+        rm.onclick = () => { pdfQueue.splice(idx, 1); renderPdfQueue(); pdfQueueChanged(); };
+
+        row.appendChild(name);
+        row.appendChild(fields);
+        row.appendChild(status);
+        row.appendChild(rm);
+        list.appendChild(row);
+    });
+    pdfQueueChanged();
+}
+
+function setPdfItemStatus(idx, st) {
+    const row = document.getElementById(`pdf-item-${idx}`);
+    const badge = document.getElementById(`pdf-status-${idx}`);
+    if (!row || !badge) return;
+    row.className = `pdf-item status-${st}`;
+    badge.className = `pdf-status ${st}`;
+    const labels = { pending: 'pending', running: 'uploading', done: 'done', error: 'error' };
+    badge.textContent = labels[st] || st;
+}
+
+// PDF file picker + drop zone
+function addPdfFiles(files) {
+    const incoming = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (!incoming.length) return;
+    const magEl = document.getElementById('pdf-mag');
+    if (!magEl.value.trim()) {
+        const p = parseFilename(incoming[0].name);
+        if (p) magEl.value = p.mag;
+    }
+    const existing = new Set(pdfQueue.map(i => i.file.name));
+    incoming.forEach(f => {
+        if (existing.has(f.name)) return;
+        const p = parseFilename(f.name);
+        pdfQueue.push({ file: f, year: p ? p.year : '', issue: p ? p.issue : '', status: 'pending' });
+    });
+    renderPdfQueue();
+}
+
+document.getElementById('pdf-file').addEventListener('change', function () {
+    if (this.files.length) addPdfFiles(this.files);
+    this.value = '';
+});
+
+const dropZone = document.getElementById('pdf-drop-zone');
+dropZone.addEventListener('click', () => document.getElementById('pdf-file').click());
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', e => {
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
+});
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) addPdfFiles(e.dataTransfer.files);
+});
+
+// OCR PDF picker info
+document.getElementById('ocr-pdf').addEventListener('change', function () {
+    const el = document.getElementById('ocr-detected');
+    if (this.files.length) {
+        el.textContent = `OCR PDF: ${this.files[0].name}`;
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Scan file list (sortable)
+// ---------------------------------------------------------------------------
+let scanFiles = [];   // ordered array of File objects
+
+function pageNumFromName(name) {
+    const m = name.match(/_(\d{3})\.jpe?g$/i);
+    return m ? parseInt(m[1], 10) : null;
+}
+
+document.getElementById('scan-files').addEventListener('change', function () {
+    if (!this.files.length) return;
+    const files = Array.from(this.files);
+
+    // Sort by embedded page number if available, else by name
+    files.sort((a, b) => {
+        const na = pageNumFromName(a.name), nb = pageNumFromName(b.name);
+        if (na !== null && nb !== null) return na - nb;
+        return a.name.localeCompare(b.name);
+    });
+
+    scanFiles = files;
+
+    // Auto-detect from first file
+    const parsed = parseFilename(files[0].name);
+    applyDetected(parsed,
+        document.getElementById('scan-mag'),
+        document.getElementById('scan-year'),
+        document.getElementById('scan-issue'),
+        document.getElementById('scan-detected'));
+
+    renderFileList();
+});
+
+function renderFileList() {
+    const list = document.getElementById('file-list');
+    list.innerHTML = '';
+    scanFiles.forEach((f, idx) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.draggable = true;
+        item.dataset.idx = idx;
+
+        item.innerHTML = `
+            <span class="file-handle">⠿</span>
+            <span class="file-orig">${f.name}</span>
+            <span class="file-dest">→ ${String(idx + 1).padStart(3, '0')}.jpg</span>
+            <button class="file-remove" onclick="removeFile(${idx})">✕</button>`;
+
+        item.addEventListener('dragstart', onDragStart);
+        item.addEventListener('dragover',  onDragOver);
+        item.addEventListener('drop',      onDrop);
+        item.addEventListener('dragend',   onDragEnd);
+        list.appendChild(item);
+    });
+}
+
+let dragSrc = null;
+function onDragStart(e) { dragSrc = this; this.classList.add('dragging'); }
+function onDragOver(e)  { e.preventDefault(); this.classList.add('drag-over'); }
+function onDragEnd()    { document.querySelectorAll('.file-item').forEach(i => i.classList.remove('dragging', 'drag-over')); }
+function onDrop(e) {
+    e.preventDefault();
+    if (!dragSrc || dragSrc === this) return;
+    const from = parseInt(dragSrc.dataset.idx);
+    const to   = parseInt(this.dataset.idx);
+    const moved = scanFiles.splice(from, 1)[0];
+    scanFiles.splice(to, 0, moved);
+    renderFileList();
+}
+
+function removeFile(idx) {
+    scanFiles.splice(idx, 1);
+    renderFileList();
+}
+
+// ---------------------------------------------------------------------------
+// Upload: PDF queue
+// ---------------------------------------------------------------------------
+function toggleSharpenOptions() {
+    document.getElementById('sharpen-options').style.display =
+        document.getElementById('pdf-sharpen').checked ? 'block' : 'none';
+}
+
+async function uploadPdfQueue() {
+    const mag              = document.getElementById('pdf-mag').value.trim();
+    const crop             = document.getElementById('pdf-crop').checked;
+    const sharpen          = document.getElementById('pdf-sharpen').checked;
+    const sharpen_radius   = document.getElementById('sharpen-radius').value.trim();
+    const sharpen_percent  = document.getElementById('sharpen-percent').value.trim();
+    const sharpen_threshold= document.getElementById('sharpen-threshold').value.trim();
+    if (!mag) { toast('Fill in Magazine name.', 'error'); return; }
+
+    const pending = pdfQueue.filter(i => i.status === 'pending');
+    if (!pending.length) { toast('No files queued.', 'error'); return; }
+
+    // Validate all items have year + issue
+    for (let i = 0; i < pdfQueue.length; i++) {
+        const item = pdfQueue[i];
+        if (item.status !== 'pending') continue;
+        if (!item.year || !item.issue) {
+            toast(`Missing year/issue for ${item.file.name}`, 'error'); return;
+        }
+    }
+
+    document.getElementById('pdf-upload-btn').disabled = true;
+
+    let anyError = false;
+    for (let i = 0; i < pdfQueue.length; i++) {
+        const item = pdfQueue[i];
+        if (item.status !== 'pending') continue;
+
+        setPdfItemStatus(i, 'running');
+        const flags = [crop ? 'crop' : '', sharpen ? 'sharpen' : ''].filter(Boolean).join(', ');
+        logLine(`Uploading ${item.file.name}${flags ? ' (' + flags + ')' : ''}...`);
+
+        const fd = new FormData();
+        fd.append('file', item.file);
+        fd.append('mag', mag);
+        fd.append('year', item.year);
+        fd.append('issue', item.issue);
+        if (crop) fd.append('crop', '1');
+        if (sharpen) {
+            fd.append('sharpen', '1');
+            fd.append('sharpen_radius',    sharpen_radius);
+            fd.append('sharpen_percent',   sharpen_percent);
+            fd.append('sharpen_threshold', sharpen_threshold);
+        }
+
+        let r;
+        try {
+            r = await fetch(apiUrl('/upload/pdf'), { method: 'POST', body: fd }).then(res => res.json());
+        } catch (e) {
+            setPdfItemStatus(i, 'error');
+            logLine(`Upload failed: ${e}`, 'error');
+            anyError = true;
+            continue;
+        }
+
+        if (!r.job_id) {
+            setPdfItemStatus(i, 'error');
+            logLine(`${item.file.name}: ${r.error || 'Upload failed'}`, 'error');
+            anyError = true;
+            continue;
+        }
+
+        // Stream the job and wait for completion before next file
+        await new Promise(resolve => {
+            streamJob(r.job_id, () => {
+                setPdfItemStatus(i, 'done');
+                resolve();
+            }, resolve);   // also resolve on stream error so queue continues
+        });
+
+        item.status = 'done';
+    }
+
+    loadMagazines();
+    toast(anyError ? 'Finished with errors' : `${pending.length} file${pending.length > 1 ? 's' : ''} uploaded`, anyError ? 'error' : 'ok');
+    document.getElementById('pdf-upload-btn').disabled = pdfQueue.every(i => i.status === 'done');
+}
+
+// ---------------------------------------------------------------------------
+// Upload: Scans
+// ---------------------------------------------------------------------------
+async function uploadScans() {
+    const mag   = document.getElementById('scan-mag').value.trim();
+    const year  = document.getElementById('scan-year').value.trim();
+    const issue = document.getElementById('scan-issue').value.trim();
+    if (!scanFiles.length || !mag || !year || !issue) { toast('Fill in all fields and select files.', 'error'); return; }
+
+    logLine(`Uploading ${scanFiles.length} page(s) for ${mag} ${issue}/${year}…`);
+    const fd = new FormData();
+    fd.append('mag', mag); fd.append('year', year); fd.append('issue', issue);
+    scanFiles.forEach((f, i) => fd.append(`page_${i}`, f));
+
+    const ocrFile = document.getElementById('ocr-pdf').files[0];
+    if (ocrFile) fd.append('ocr_pdf', ocrFile);
+
+    const r = await fetch(apiUrl('/upload/scans'), { method: 'POST', body: fd }).then(r => r.json());
+    if (r.job_id) {
+        streamJob(r.job_id, loadMagazines);
+    } else {
+        toast(r.error || 'Upload failed', 'error');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tools
+// ---------------------------------------------------------------------------
+async function rebuildManifest() {
+    logLine('Rebuilding manifest.json…');
+    const r = await fetch(apiUrl('/rebuild-manifest'), { method: 'POST' }).then(r => r.json());
+    if (r.ok) toast('manifest.json rebuilt');
+    else toast(r.error || 'Error', 'error');
+}
+
+// ---------------------------------------------------------------------------
+// OCR Review panel
+// ---------------------------------------------------------------------------
+async function openReview(mag, year, issue) {
+    document.getElementById('review-title').textContent = `${mag} ${issue}/${year} — OCR Review`;
+    document.getElementById('rv-pages').textContent  = '…';
+    document.getElementById('rv-avg').textContent    = '…';
+    document.getElementById('rv-total').textContent  = '…';
+    document.getElementById('review-sidebar').innerHTML = '<div style="color:#888;padding:20px 12px;font-size:13px">Loading…</div>';
+    document.getElementById('review-reader').innerHTML = '<div class="review-empty">Loading…</div>';
+    document.getElementById('review-panel').classList.add('open');
+
+    const data = await fetch(`${apiUrl('/index-data')}?mag=${encodeURIComponent(mag)}&year=${year}&issue=${issue}`)
+        .then(r => r.json());
+
+    document.getElementById('rv-pages').textContent  = data.total_pages;
+    document.getElementById('rv-avg').textContent    = data.avg_chars.toLocaleString();
+    document.getElementById('rv-total').textContent  = data.total_chars.toLocaleString();
+
+    const sidebar = document.getElementById('review-sidebar');
+    const reader = document.getElementById('review-reader');
+    sidebar.innerHTML = '';
+    reader.innerHTML = '';
+
+    function renderReader(p) {
+        const tags = p.page_tags || [];
+        reader.innerHTML = '';
+
+        const toolbar = document.createElement('div');
+        toolbar.className = 'review-reader-toolbar';
+        toolbar.innerHTML = `
+            <div class="review-reader-title">p.${p.page}</div>
+            <div class="review-reader-meta">
+                <span id="rv-reader-chars">${p.chars.toLocaleString()} chars</span>
+                ${tags.length
+                    ? ` · <span class="review-tags">${tags.map(tag => `<span class="review-tag">${tag}</span>`).join('')}</span>`
+                    : ' · no tags'}
+            </div>
+            <div class="review-reader-actions">
+                <button class="btn btn-primary btn-sm" id="rv-open-viewer">Open in Viewer</button>
+                <button class="btn btn-ghost btn-sm" id="rv-prev">← Prev</button>
+                <button class="btn btn-ghost btn-sm" id="rv-next">Next →</button>
+            </div>`;
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'review-page-text';
+        textarea.value = p.text;
+        const origText = p.text;
+
+        const footer = document.createElement('div');
+        footer.className = 'review-page-footer';
+        const indicator = document.createElement('span');
+        indicator.className = 'save-indicator';
+        indicator.textContent = 'Saved';
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn btn-primary btn-sm';
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = '0.4';
+        footer.appendChild(indicator);
+        footer.appendChild(saveBtn);
+
+        textarea.addEventListener('input', () => {
+            const changed = textarea.value !== origText;
+            textarea.classList.toggle('dirty', changed);
+            saveBtn.disabled = !changed;
+            saveBtn.style.opacity = changed ? '1' : '0.4';
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving…';
+            const r = await fetch(apiUrl('/update-page'), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ mag: data.mag, year: data.year, issue: data.issue,
+                                       page: p.page, text: textarea.value }),
+            }).then(r => r.json());
+            if (r.ok) {
+                p.text = textarea.value;
+                p.chars = textarea.value.length;
+                saveBtn.textContent = 'Save';
+                saveBtn.style.opacity = '0.4';
+                textarea.classList.remove('dirty');
+                document.getElementById('rv-reader-chars').textContent = p.chars.toLocaleString() + ' chars';
+                const charsEl = document.getElementById(`rv-chars-${p.page}`);
+                if (charsEl) charsEl.textContent = p.chars.toLocaleString() + ' chars';
+                indicator.style.display = 'inline';
+                setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+            } else {
+                saveBtn.textContent = 'Save';
+                saveBtn.disabled = false;
+                toast(r.error || 'Save failed', 'error');
+            }
+        });
+
+        const idx = data.pages.findIndex(x => x.page === p.page);
+        const openViewerBtn = toolbar.querySelector('#rv-open-viewer');
+        const prevBtn = toolbar.querySelector('#rv-prev');
+        const nextBtn = toolbar.querySelector('#rv-next');
+        openViewerBtn.addEventListener('click', () => openViewer(data.mag, data.year, data.issue, p.page));
+        prevBtn.disabled = idx <= 0;
+        nextBtn.disabled = idx < 0 || idx >= data.pages.length - 1;
+        prevBtn.style.opacity = prevBtn.disabled ? '0.4' : '1';
+        nextBtn.style.opacity = nextBtn.disabled ? '0.4' : '1';
+        prevBtn.addEventListener('click', () => { if (idx > 0) selectPage(data.pages[idx - 1].page); });
+        nextBtn.addEventListener('click', () => { if (idx < data.pages.length - 1) selectPage(data.pages[idx + 1].page); });
+
+        reader.appendChild(toolbar);
+        reader.appendChild(textarea);
+        reader.appendChild(footer);
+        textarea.focus();
+        textarea.setSelectionRange(0, 0);
+    }
+
+    function selectPage(pageNum) {
+        sidebar.querySelectorAll('.review-page-item').forEach(el => {
+            el.classList.toggle('active', Number(el.dataset.page) === pageNum);
+        });
+        const page = data.pages.find(p => p.page === pageNum);
+        if (page) renderReader(page);
+    }
+
+    data.pages.forEach(p => {
+        const quality = p.chars > 1500 ? 'high' : p.chars > 400 ? 'mid' : 'low';
+        const barPct = Math.min(100, Math.round(p.chars / 30));
+        const item = document.createElement('div');
+        item.className = 'review-page-item';
+        item.dataset.page = p.page;
+        const hasAdTag = (p.page_tags || []).includes('ad_fullpage');
+        item.innerHTML = `
+            <div class="review-page-head">
+                <span class="review-page-num-wrap">
+                    <span class="review-page-num">p.${p.page}</span>
+                    ${hasAdTag ? '<span class="review-flag-inline">(ad)</span>' : ''}
+                </span>
+                <span class="review-chars" id="rv-chars-${p.page}">${p.chars.toLocaleString()} chars</span>
+                <div class="review-bar-wrap">
+                    <div class="review-bar bar-${quality}" style="width:${barPct}%"></div>
+                </div>
+            </div>
+            <div class="review-snippet">${(p.text || '').replace(/</g, '&lt;')}</div>`;
+        item.addEventListener('click', () => selectPage(p.page));
+        sidebar.appendChild(item);
+    });
+
+    if (!data.pages.length) {
+        sidebar.innerHTML = '<div style="color:#888;padding:20px 12px;font-size:13px">No indexed pages found for this issue.</div>';
+        reader.innerHTML = '<div class="review-empty">No indexed pages found for this issue.</div>';
+        return;
+    }
+
+    selectPage(data.pages[0].page);
+}
+
+function closeReview() {
+    document.getElementById('review-panel').classList.remove('open');
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+loadMagazines();
+</script>
+</body>
+</html>

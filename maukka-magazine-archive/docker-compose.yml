@@ -17,6 +17,7 @@ services:
     depends_on:
       - init
       - search
+      - admin
     volumes:
       - ${APP_DATA_DIR}:/usr/share/nginx/html:ro
 
@@ -31,6 +32,25 @@ services:
       SEARCH_PORT: 8002
       SEARCH_DB: /data/site/search.db
       SEARCH_STATIC_ROOT: /data/site
+    volumes:
+      - ${APP_DATA_DIR}:/data:rw
+
+  admin:
+    image: ghcr.io/maukkae/magazine-archive-admin:latest
+    restart: unless-stopped
+    depends_on:
+      - init
+    environment:
+      ADMIN_HOST: 0.0.0.0
+      ADMIN_PORT: 8001
+      ARCHIVE_JPG_DIR: /data/site/jpg
+      ARCHIVE_MANIFEST_FILE: /data/site/manifest.json
+      ARCHIVE_SEARCH_INDEX_FILE: /data/site/search_index.json
+      ARCHIVE_SEARCH_DB_FILE: /data/site/search.db
+      ARCHIVE_CAROUSEL_FILE: /data/site/carousel.html
+      ARCHIVE_MOBILE_FILE: /data/site/mobile.html
+      ARCHIVE_PDF_DIR: /data/pdf
+      ARCHIVE_SCAN_DIR: /data/scans
     volumes:
       - ${APP_DATA_DIR}:/data:rw
 

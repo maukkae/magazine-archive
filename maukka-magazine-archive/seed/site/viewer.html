@@ -1320,7 +1320,11 @@
     }
 
     function adminApiUrl(path) {
-        return `${adminApiBase}${path}`;
+        const base = String(adminApiBase || '').replace(/\/$/, '');
+        if (base.endsWith('/admin-api') || base.endsWith('/api')) {
+            return `${base}${path.replace(/^\/api/, '')}`;
+        }
+        return `${base}${path}`;
     }
 
     function selectedTag() {

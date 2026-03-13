@@ -8,6 +8,7 @@ on:
       - "maukka-magazine-archive/viewer/**"
       - "maukka-magazine-archive/search/**"
       - "maukka-magazine-archive/init/**"
+      - "maukka-magazine-archive/admin/**"
       - "maukka-magazine-archive/docker-compose.yml"
       - ".github/workflows/publish-ghcr-images.yml"
   workflow_dispatch:
@@ -35,6 +36,10 @@ jobs:
             context: ./maukka-magazine-archive
             dockerfile: ./maukka-magazine-archive/init/Dockerfile
             image: ghcr.io/maukkae/magazine-archive-init
+          - name: admin
+            context: ./maukka-magazine-archive
+            dockerfile: ./maukka-magazine-archive/admin/Dockerfile
+            image: ghcr.io/maukkae/magazine-archive-admin
 
     steps:
       - name: Checkout
