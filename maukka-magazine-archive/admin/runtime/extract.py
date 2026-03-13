@@ -393,7 +393,10 @@ def _clean_text(text: str) -> str:
     - Remove soft hyphens (PDF line-break artifact)
     - Strip characters outside basic Latin + Latin Extended (0xC0-0x24F),
       which catches garbled OCR symbols while keeping Finnish/European chars
-    - Join hyphenated line-break words like ``kuin -ka`` -> ``kuinka``
+    - Join hyphenated line-break words like ``kuin -ka`` -> ``kuinka`` and
+      ``kaiutin -ten`` -> ``kaiutinten``
+    - Join likely dehyphenated line-break fragments like
+      ``menevyyt\n tä`` -> ``menevyyttä`` and ``pal\n jon`` -> ``paljon``
     - Collapse whitespace
     """
     text = text.replace('\xad', '')  # soft hyphen
@@ -405,6 +408,24 @@ def _clean_text(text: str) -> str:
         else:
             cleaned.append(' ')
     text = ''.join(cleaned)
+    # Some embedded-text PDFs lose the actual hyphen but keep a line break in the
+    # middle of the word. Join only short lowercase continuations so we do not
+    # aggressively merge ordinary word boundaries across lines.
+    finnish_short_words = (
+        "ja|on|ei|se|ne|jo|kuin|kun|tai|vaan|että|joka|joka|jos|oli|ovat|voi|myös|vain"
+    )
+    text = re.sub(
+        rf'(?<![.!?:;])\b([a-zåäö]{{3,}})\s*\n\s*(?!{finnish_short_words}\b)([a-zåäö]{{1,4}})\b',
+        r'\1\2',
+        text,
+    )
+    # Join cases where the next line starts with a hyphenated continuation:
+    # "kaiutin\n-ten" -> "kaiutinten"
+    text = re.sub(
+        r'([A-Za-zÅÄÖåäö]+)\s+-\s*([A-Za-zÅÄÖåäö]+)',
+        r'\1\2',
+        text,
+    )
     text = re.sub(
         r'([A-Za-zÅÄÖåäö]+)\s*-\s+([A-Za-zÅÄÖåäö]+)',
         r'\1\2',

@@ -163,7 +163,12 @@ Confirmed working pieces:
 - the app installs from the custom store
 - GHCR-backed images work
 - the app icon renders in the Umbrel launcher
+- screenshots render in the Umbrel store UI
 - the app runs after reseeding content into its app-data directory
+- the admin route works at `/admin/`
+- JPG upload works
+- remote Ollama OCR works inside the app UI
+- app updates now refresh the static shell without wiping live archive data
 
 Confirmed caveat:
 
@@ -184,6 +189,18 @@ Current reseed helper:
 
 - [umbrel/reseed_app_data.sh](E:\claude_projects\pelit_cover_sheets\umbrel\reseed_app_data.sh)
 
+## Current known-good app-store tag
+
+The current packaging repo rollback point is:
+
+- `umbrel-app-working-2026-03-13`
+
 ## Next major app-store task
 
-Add the admin/upload workflow to the app package so the installed app can be populated and maintained without manual host-side copying.
+The app-store package is now close to parity with the manual Umbrel version.
+
+The next remaining work is mainly:
+
+- polish admin UX inside the app package
+- verify OCR patch import flow end to end in the app package
+- keep static shell and mutable archive data clearly separated over time
