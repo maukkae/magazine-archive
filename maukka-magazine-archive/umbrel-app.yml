@@ -4,7 +4,7 @@ name: Magazine Archive
 tagline: Browse and search a self-hosted magazine collection
 icon: https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/icon.png
 category: media
-version: "0.1.12"
+version: "0.1.13"
 port: 8098
 description: >-
   Magazine Archive is a self-hosted viewer for retro and modern magazine
@@ -27,8 +27,8 @@ gallery:
   - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/5.png
   - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/6.png
 releaseNotes: >-
-  Includes the dynamic manifest-based landing page and fixes packaging so
-  seed-shell changes trigger image rebuilds automatically on future updates.
+  Includes the improved filename-based magazine detection for uploads, along
+  with the dynamic manifest-based landing page and seed-triggered rebuild fix.
 dependencies: []
 path: ""
 defaultUsername: ""

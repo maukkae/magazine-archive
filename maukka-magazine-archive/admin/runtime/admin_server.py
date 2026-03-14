@@ -35,7 +35,14 @@ from ollama_ocr import (
     normalize_ollama_host,
     ollama_test_connection,
 )
-from search_store import SEARCH_DB_FILE, normalize_issue_id, read_index_json, sync_issue_db, write_index_json
+from search_store import (
+    SEARCH_DB_FILE,
+    normalize_issue_id,
+    read_index_json,
+    sync_issue_db,
+    sync_magazine_db,
+    write_index_json,
+)
 
 HOST     = os.environ.get("ADMIN_HOST", "127.0.0.1")
 PORT     = int(os.environ.get("ADMIN_PORT", "8001"))
@@ -60,6 +67,11 @@ def _write_index(data):
 def _write_index_issue(data, mag: str, year: str, issue: str):
     write_index_json(data, index_path=SEARCH_INDEX_FILE, db_path=SEARCH_DB_FILE, rebuild_db=False)
     sync_issue_db(data, mag=mag, year=year, issue=issue, db_path=SEARCH_DB_FILE)
+
+
+def _write_index_magazine(data, mag: str):
+    write_index_json(data, index_path=SEARCH_INDEX_FILE, db_path=SEARCH_DB_FILE, rebuild_db=False)
+    sync_magazine_db(data, mag=mag, db_path=SEARCH_DB_FILE)
 
 
 def _normalize_issue(issue: str) -> str:
@@ -478,7 +490,7 @@ def api_remove_magazine():
     idx["pages"]   = [p for p in idx["pages"]   if p["mag"] != mag]
     idx["done"]    = [k for k in idx["done"]    if not k.startswith(f"{mag}/")]
     idx["no_text"] = [k for k in idx["no_text"] if not k.startswith(f"{mag}/")]
-    _write_index(idx)
+    _write_index_magazine(idx, mag=mag)
 
     update_magazines_html(_all_magazines())
     update_manifest()
@@ -570,7 +582,7 @@ def api_clear_index():
         idx["pages"]   = [p for p in idx["pages"]   if p["mag"] != mag]
         idx["done"]    = [k for k in idx["done"]    if not k.startswith(f"{mag}/")]
         idx["no_text"] = [k for k in idx["no_text"] if not k.startswith(f"{mag}/")]
-        _write_index(idx)
+        _write_index_magazine(idx, mag=mag)
     return jsonify({"ok": True})
 
 

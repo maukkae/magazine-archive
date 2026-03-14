@@ -325,6 +325,38 @@ def sync_issue_db(index_data: dict, mag: str, year: str, issue: str, db_path: Pa
         conn.close()
 
 
+def sync_magazine_db(index_data: dict, mag: str, db_path: Path = SEARCH_DB_FILE) -> None:
+    db_path = Path(db_path)
+    conn = connect_search_db(db_path)
+    payload = _normalized_payload(index_data)
+    try:
+        conn.execute("DELETE FROM pages WHERE mag = ?", (mag,))
+        magazine_pages = [
+            entry for entry in payload.get("pages", [])
+            if entry["mag"] == mag
+        ]
+        if magazine_pages:
+            conn.executemany(
+                """
+                INSERT INTO pages (
+                    mag, year, issue, page, text, page_tags_json, is_hidden_search,
+                    search_direct, search_normalized, search_compact
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [_page_row(entry) for entry in magazine_pages],
+            )
+        conn.executemany(
+            "INSERT OR REPLACE INTO meta (key, value_json) VALUES (?, ?)",
+            [
+                ("done", _json_dumps(payload.get("done", []))),
+                ("no_text", _json_dumps(payload.get("no_text", []))),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def sync_db_from_json(index_path: Path = SEARCH_INDEX_JSON, db_path: Path = SEARCH_DB_FILE) -> None:
     index_path = Path(index_path)
     db_path = Path(db_path)

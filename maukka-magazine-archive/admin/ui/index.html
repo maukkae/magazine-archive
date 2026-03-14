@@ -1295,7 +1295,8 @@ function normalizeMagGuess(raw) {
     const match = magazineNames.find(name =>
         String(name).toLocaleLowerCase().replace(/[\s_-]+/g, '') === normalizedGuess
     );
-    return match || '';
+    if (match) return match;
+    return guess.trim();
 }
 
 function parseFilename(name) {
