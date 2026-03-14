@@ -339,7 +339,6 @@
         <script src="lang.js"></script>
         <script>
                 const t = Lang.t.bind(Lang);
-                const MAGAZINES = [];
 
                 const carousel          = document.getElementById('carousel');
                 const magSelect         = document.getElementById('magSelect');
@@ -399,6 +398,12 @@
                                                 .map(iss => `${mag}_${year}_${iss}_cover.jpg`);
                                 }
                         }
+                }
+
+                function availableMagazines() {
+                        return Object.keys(allCoversData)
+                                .filter(mag => Object.keys(allCoversData[mag] || {}).length > 0)
+                                .sort((a, b) => a.localeCompare(b));
                 }
 
                 // Extract year + issue from a cover filename given current mag.
@@ -906,9 +911,7 @@
                 (async () => {
                         await loadAllData();
 
-                        available = MAGAZINES.filter(mag =>
-                                Object.keys(allCoversData[mag] || {}).length > 0
-                        );
+                        available = availableMagazines();
                         if (!available.length) return;
 
                         available.forEach(mag => {

@@ -227,7 +227,6 @@
     <script src="lang.js"></script>
     <script>
         const t = Lang.t.bind(Lang);
-        const MAGAZINES = [];
 
         const magSelect  = document.getElementById('magSelect');
         const yearSelect = document.getElementById('yearSelect');
@@ -257,6 +256,12 @@
                         .map(iss => ({ iss, file: `${mag}_${year}_${iss}_cover.jpg` }));
                 }
             }
+        }
+
+        function availableMagazines() {
+            return Object.keys(allCoversData)
+                .filter(mag => Object.keys(allCoversData[mag] || {}).length > 0)
+                .sort((a, b) => a.localeCompare(b));
         }
 
         function appendCoverItem(iss, file, year) {
@@ -419,9 +424,7 @@
             message.textContent = t('loading_covers');
             await loadAllData();
 
-            available = MAGAZINES.filter(mag =>
-                Object.keys(allCoversData[mag] || {}).length > 0
-            );
+            available = availableMagazines();
             if (!available.length) { message.textContent = t('no_covers'); return; }
 
             available.forEach(mag => {
