@@ -35,7 +35,7 @@ from ollama_ocr import (
     normalize_ollama_host,
     ollama_test_connection,
 )
-from search_store import SEARCH_DB_FILE, read_index_json, write_index_json
+from search_store import SEARCH_DB_FILE, normalize_issue_id, read_index_json, sync_issue_db, write_index_json
 
 HOST     = os.environ.get("ADMIN_HOST", "127.0.0.1")
 PORT     = int(os.environ.get("ADMIN_PORT", "8001"))
@@ -57,11 +57,14 @@ def _write_index(data):
     write_index_json(data, index_path=SEARCH_INDEX_FILE)
 
 
+def _write_index_issue(data, mag: str, year: str, issue: str):
+    write_index_json(data, index_path=SEARCH_INDEX_FILE, db_path=SEARCH_DB_FILE, rebuild_db=False)
+    sync_issue_db(data, mag=mag, year=year, issue=issue, db_path=SEARCH_DB_FILE)
+
+
 def _normalize_issue(issue: str) -> str:
-    issue = str(issue or "").strip()
-    if not re.match(r"^\d{1,4}$", issue):
-        return ""
-    return issue.zfill(2) if len(issue) == 1 else issue
+    issue = normalize_issue_id(issue)
+    return issue if re.match(r"^\d{2,4}(?:-\d{2,4})?$", issue) else ""
 
 
 def _read_manifest():
@@ -341,7 +344,7 @@ def api_update_page():
     if not updated:
         return jsonify({"error": "page not found"}), 404
 
-    _write_index(idx)
+    _write_index_issue(idx, mag=mag, year=year, issue=issue)
     return jsonify({"ok": True})
 
 
@@ -447,7 +450,7 @@ def api_page_tags():
         })
         updated = True
 
-    _write_index(idx)
+    _write_index_issue(idx, mag=mag, year=year, issue=issue)
     return jsonify({"ok": True, "page_tags": clean_tags})
 
 
@@ -542,7 +545,7 @@ def api_remove_issue():
                       if not (p["mag"] == mag and p["year"] == year and p["issue"] == issue)]
     idx["done"]    = [k for k in idx["done"]    if k != key]
     idx["no_text"] = [k for k in idx["no_text"] if k != key]
-    _write_index(idx)
+    _write_index_issue(idx, mag=mag, year=year, issue=issue)
 
     update_manifest()
     return jsonify({"ok": True})
@@ -562,11 +565,12 @@ def api_clear_index():
                           if not (p["mag"] == mag and p["year"] == year and p["issue"] == issue)]
         idx["done"]    = [k for k in idx["done"]    if k != key]
         idx["no_text"] = [k for k in idx["no_text"] if k != key]
+        _write_index_issue(idx, mag=mag, year=year, issue=issue)
     elif mag:
         idx["pages"]   = [p for p in idx["pages"]   if p["mag"] != mag]
         idx["done"]    = [k for k in idx["done"]    if not k.startswith(f"{mag}/")]
         idx["no_text"] = [k for k in idx["no_text"] if not k.startswith(f"{mag}/")]
-    _write_index(idx)
+        _write_index(idx)
     return jsonify({"ok": True})
 
 
@@ -600,7 +604,7 @@ def api_import_ocr_patch():
             "ok": True,
             "mag": str(patch["mag"]),
             "year": str(patch["year"]),
-            "issue": str(patch["issue"]).zfill(2),
+            "issue": normalize_issue_id(patch["issue"]),
             "pages": len(patch["pages"]),
         }
     )

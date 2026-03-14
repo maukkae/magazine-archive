@@ -11,7 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
-from search_store import read_index_json, sync_issue_db, write_index_json
+from search_store import normalize_issue_id, read_index_json, sync_issue_db, write_index_json
 
 
 def load_patch(path: Path) -> dict:
@@ -26,7 +26,7 @@ def load_patch(path: Path) -> dict:
 def import_patch(patch: dict, index_path: Path, db_path: Path) -> None:
     mag = str(patch["mag"])
     year = str(patch["year"])
-    issue = str(patch["issue"]).zfill(2)
+    issue = normalize_issue_id(patch["issue"])
     key = f"{mag}/{year}/{issue}"
 
     index = read_index_json(index_path=index_path)
@@ -36,7 +36,7 @@ def import_patch(patch: dict, index_path: Path, db_path: Path) -> None:
         same_issue = (
             entry["mag"] == mag
             and str(entry["year"]) == year
-            and str(entry["issue"]).zfill(2) == issue
+            and normalize_issue_id(entry["issue"]) == issue
         )
         if same_issue:
             existing_issue_pages[int(entry["page"])] = entry
@@ -84,7 +84,7 @@ def import_patch(patch: dict, index_path: Path, db_path: Path) -> None:
     issue_has_text = any(
         entry["mag"] == mag
         and str(entry["year"]) == year
-        and str(entry["issue"]).zfill(2) == issue
+        and normalize_issue_id(entry["issue"]) == issue
         and (entry.get("text", "") or "").strip()
         for entry in retained_pages
     )
@@ -111,7 +111,7 @@ def main() -> None:
     patch = load_patch(args.patch)
     import_patch(patch, index_path=args.index, db_path=args.db)
     print(
-        f"Imported OCR patch for {patch['mag']}/{patch['year']}/{str(patch['issue']).zfill(2)} "
+        f"Imported OCR patch for {patch['mag']}/{patch['year']}/{normalize_issue_id(patch['issue'])} "
         f"with {len(patch['pages'])} page(s)"
     )
 

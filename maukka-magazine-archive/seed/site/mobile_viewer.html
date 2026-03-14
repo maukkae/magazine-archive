@@ -45,6 +45,22 @@
             position: relative;
         }
 
+        .ad-page-overlay {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            color: rgba(0, 0, 0, 0.055);
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.18);
+            user-select: none;
+            z-index: 2;
+            white-space: nowrap;
+        }
+
         /* Natural (unzoomed) image sizing.
            In landscape 2-page mode JS sets max-width to calc(50vw - 2px) inline.
            In portrait JS leaves max-width at 100vw (the CSS default below). */
@@ -289,6 +305,8 @@
     <div class="slot" id="slotCurr">
         <img class="pg" id="imgCurrA" src="" alt="">
         <img class="pg" id="imgCurrB" src="" alt="" hidden>
+        <div class="ad-page-overlay" id="adOverlayA" hidden></div>
+        <div class="ad-page-overlay" id="adOverlayB" hidden></div>
     </div>
     <div class="slot" id="slotNext">
         <img class="pg" id="imgNextA" src="" alt="">
@@ -341,15 +359,39 @@
     const params  = new URLSearchParams(location.search);
     const mag     = params.get('mag')   || 'Magazine Archive';
     const year    = params.get('year')  || '1992';
-    const issue   = (params.get('issue') || '01').padStart(2, '0');
+    const issue   = params.get('issue') || '01';
+    const issueLabel = issue;
+    const issueNumber = parseInt(issue.split('-')[0], 10);
+    function getAdminApiBase() {
+        const port = window.location.port || '';
+        const host = window.location.hostname || '127.0.0.1';
+        if (port === '8088' || port === '8000' || port === '8002') {
+            return `${window.location.protocol}//${host}:8001/api`;
+        }
+        return `${window.location.origin}/admin-api`;
+    }
+    function issueText(key, total = null) {
+        if (issue.includes('-')) {
+            if (key === 'grid') return `${magName} ${year} / ${issueLabel} · ${total} pages`;
+            if (key === 'loading') return `Loading ${magName} ${year} / ${issueLabel}...`;
+            return `${magName} ${year} / ${issueLabel}`;
+        }
+        if (key === 'grid') return t('grid_title', {mag: magName, year, n: issueNumber, total});
+        if (key === 'loading') return t('loading_issue', {mag: magName, year, n: issueNumber});
+        return t('issue_title', {mag: magName, year, n: issueNumber});
+    }
     const requestedPageNum = parseInt(params.get('page') || '1', 10);
     const prefix  = `${mag}_${year}_${issue}`;
     const baseDir = `/jpg/${mag}/${year}/${issue}`;
     const magName = mag.replace(/_/g, ' ');
+    const adminApiBase = getAdminApiBase();
+    let pageTagMap = new Map();
 
     document.getElementById('issueTitle').textContent =
-        t('issue_title', {mag: magName, year, n: parseInt(issue, 10)});
-    document.title = `${magName} · ${year} · Issue #${parseInt(issue, 10)}`;
+        issue.includes('-')
+            ? `${magName} ${year} / ${issueLabel}`
+            : t('issue_title', {mag: magName, year, n: issueNumber});
+    document.title = `${magName} · ${year} · ${issueLabel}`;
     // Set initial translatable UI text (before async pages load)
     (function initStaticLang() {
         const backBtnLabel = document.getElementById('backBtnLabel');
@@ -371,6 +413,8 @@
     const imgPrevB      = document.getElementById('imgPrevB');
     const imgCurrA      = document.getElementById('imgCurrA');
     const imgCurrB      = document.getElementById('imgCurrB');
+    const adOverlayA    = document.getElementById('adOverlayA');
+    const adOverlayB    = document.getElementById('adOverlayB');
     const imgNextA      = document.getElementById('imgNextA');
     const imgNextB      = document.getElementById('imgNextB');
     const pageIndicator = document.getElementById('pageIndicator');
@@ -585,6 +629,7 @@
             img.style.transform = `translate(${x}px, ${ty}px)`;
             x += scaledW[i] + info.gap;
         });
+        updateAdOverlays();
     }
 
     function clampPan() {
@@ -667,6 +712,51 @@
         else         { imgB.src = '';       imgB.hidden = true; }
     }
 
+    function currentVisiblePageNumbers() {
+        if (!isLandscape()) return [currentPage + 1];
+        const si = pageToSpreadIdx(currentPage);
+        const start = spreadStartPage(si);
+        const spread = landscapeSpreads[si] || [pages[currentPage]];
+        return Array.from({ length: spread.length }, (_, idx) => start + idx + 1);
+    }
+
+    function updateAdOverlays() {
+        const pageNums = currentVisiblePageNumbers();
+        const pairs = [
+            [imgCurrA, adOverlayA, pageNums[0]],
+            [imgCurrB, adOverlayB, pageNums[1]],
+        ];
+        pairs.forEach(([img, overlay, pageNum]) => {
+            if (!overlay) return;
+            const tags = pageTagMap.get(pageNum) || [];
+            const show = !img.hidden && !!pageNum && tags.includes('ad_fullpage');
+            overlay.hidden = !show;
+            if (!show) return;
+            overlay.textContent = t('ad_overlay');
+            const fontSize = Math.max(30, Math.min(img.clientWidth, img.clientHeight) * 0.22);
+            overlay.style.fontSize = `${fontSize}px`;
+            overlay.style.width = `${img.clientWidth}px`;
+            overlay.style.height = `${img.clientHeight}px`;
+            overlay.style.left = `${img.offsetLeft}px`;
+            overlay.style.top = `${img.offsetTop}px`;
+            overlay.style.transform = 'rotate(-52deg)';
+        });
+    }
+
+    async function loadPageTags() {
+        try {
+            const url = `${adminApiBase}/page-tags?mag=${encodeURIComponent(mag)}&year=${encodeURIComponent(year)}&issue=${encodeURIComponent(issue)}`;
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(String(resp.status));
+            const data = await resp.json();
+            pageTagMap = new Map((data.pages || []).map(p => [Number(p.page), p.page_tags || []]));
+        } catch (_) {
+            pageTagMap = new Map();
+        } finally {
+            updateAdOverlays();
+        }
+    }
+
     function updateStrip() {
         zoom = 1; panX = 0; panY = 0;
         // Snap position FIRST before touching slot content.
@@ -688,6 +778,7 @@
         setSlot(imgPrevA, imgPrevB, getAdjacentUrls(-1));
         setSlot(imgNextA, imgNextB, getAdjacentUrls(+1));
         applyZoom();   // applies immediately if images are cached; load events handle the rest
+        updateAdOverlays();
         updatePageIndicator();
         syncPageParam();
         if (gridBuilt) updateGridHighlight();
@@ -738,8 +829,8 @@
     }
 
     // Re-apply precise layout after images finish loading (needed for landscape 2-page spreads).
-    imgCurrA.addEventListener('load', () => { if (!imgCurrA.hidden) applyZoom(); });
-    imgCurrB.addEventListener('load', () => { if (!imgCurrB.hidden) applyZoom(); });
+    imgCurrA.addEventListener('load', () => { if (!imgCurrA.hidden) { applyZoom(); updateAdOverlays(); } });
+    imgCurrB.addEventListener('load', () => { if (!imgCurrB.hidden) { applyZoom(); updateAdOverlays(); } });
 
     // Re-layout on orientation change / window resize.
     // isLandscape() uses window.orientation (set instantly) so there is no
@@ -1072,8 +1163,7 @@
 
     // ---- Grid ----
     function buildGrid() {
-        document.getElementById('gridTitle').textContent =
-            t('grid_title', {mag: magName, year, n: parseInt(issue, 10), total: pages.length});
+        document.getElementById('gridTitle').textContent = issueText('grid', pages.length);
         gridInner.innerHTML = '';
         pages.forEach((url, idx) => {
             const item           = document.createElement('div');
@@ -1129,7 +1219,8 @@
 
     // ---- Init ----
     (async () => {
-        loadingText.textContent = t('loading_issue', {mag: magName, year, n: parseInt(issue, 10)});
+        await loadPageTags();
+        loadingText.textContent = issueText('loading');
         pages = await discoverPages();
         if (!pages.length) {
             loadingText.textContent = t('no_pages');
@@ -1155,12 +1246,12 @@
         gridBtn.title = t('page_grid');
         updateFullscreenButton();
         // Update issue title
-        document.getElementById('issueTitle').textContent =
-            t('issue_title', {mag: magName, year, n: parseInt(issue, 10)});
+        document.getElementById('issueTitle').textContent = issueText('title');
         // Refresh page indicator
         if (pages.length) {
             updatePageIndicator();
             if (gridBuilt) buildGrid();
+            updateAdOverlays();
         }
     }
 

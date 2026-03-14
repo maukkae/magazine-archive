@@ -54,6 +54,12 @@
       badge_walkthrough:      'Walkthrough',
       open_in_reader:         'Open in reader',
       page_number_prefix:     'p.',
+      ad_overlay:             'ADVERT',
+      ads_toggle:             'ADS',
+      hide_ads:               'Hide ad pages',
+      show_ads:               'Show ad pages',
+      hide_ads_menu:          'Ads',
+      watermark_menu:         'Watermark',
     },
     fi: {
       landing_title:          'LEHDET',
@@ -107,6 +113,12 @@
       badge_walkthrough:      'Ratkaisu',
       open_in_reader:         'Avaa lukijassa',
       page_number_prefix:     's.',
+      ad_overlay:             'MAINOS',
+      ads_toggle:             'MAINOKSET',
+      hide_ads:               'Piilota mainossivut',
+      show_ads:               'Näytä mainossivut',
+      hide_ads_menu:          'Mainokset',
+      watermark_menu:         'Vesileima',
     },
   };
 

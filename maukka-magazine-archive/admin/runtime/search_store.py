@@ -11,6 +11,21 @@ SEARCH_DB_FILE = Path(os.environ.get("ARCHIVE_SEARCH_DB_FILE", "search.db"))
 SEARCH_STOPWORDS = {"a", "an", "and", "the", "of"}
 
 
+def normalize_issue_id(issue: str) -> str:
+    issue = str(issue or "").strip()
+    if not issue:
+        return ""
+    m = re.fullmatch(r"(\d{1,4})(?:-(\d{1,4}))?", issue)
+    if not m:
+        return issue
+    first = m.group(1).zfill(2) if len(m.group(1)) == 1 else m.group(1)
+    second = m.group(2)
+    if second is None:
+        return first
+    second = second.zfill(2) if len(second) == 1 else second
+    return f"{first}-{second}"
+
+
 def normalize_search_text(text: str) -> str:
     text = text or ""
     text = re.sub(r"([\w\d])([A-Z])", r"\1 \2", text)
@@ -171,7 +186,7 @@ def _page_row(entry: dict) -> tuple:
     return (
         entry["mag"],
         str(entry["year"]),
-        str(entry["issue"]).zfill(2),
+        normalize_issue_id(entry["issue"]),
         int(entry["page"]),
         text,
         _json_dumps(tags),
@@ -189,7 +204,7 @@ def _review_row(entry: dict) -> tuple:
         game,
         entry["mag"],
         str(entry["year"]),
-        str(entry["issue"]).zfill(2),
+        normalize_issue_id(entry["issue"]),
         int(entry["page"]) if entry.get("page") not in (None, "") else None,
         entry["type"],
         entry.get("score"),
@@ -275,7 +290,7 @@ def sync_issue_db(index_data: dict, mag: str, year: str, issue: str, db_path: Pa
     db_path = Path(db_path)
     conn = connect_search_db(db_path)
     year = str(year)
-    issue = str(issue).zfill(2)
+    issue = normalize_issue_id(issue)
     payload = _normalized_payload(index_data)
     try:
         conn.execute(
@@ -286,7 +301,7 @@ def sync_issue_db(index_data: dict, mag: str, year: str, issue: str, db_path: Pa
             entry for entry in payload.get("pages", [])
             if entry["mag"] == mag
             and str(entry["year"]) == year
-            and str(entry["issue"]).zfill(2) == issue
+            and normalize_issue_id(entry["issue"]) == issue
         ]
         if issue_pages:
             conn.executemany(

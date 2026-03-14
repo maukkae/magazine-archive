@@ -255,9 +255,19 @@ body.log-expanded {
     border-radius: 8px; padding: 4px 7px; font-size: 12px; outline: none;
 }
 .pdf-field:focus { border-color: var(--accent); color: #fff; }
+.pdf-field.invalid,
+.form-group input.invalid,
+#scan-mag.invalid,
+#scan-year.invalid,
+#scan-issue.invalid {
+    border-color: var(--error) !important;
+    background: rgba(122, 26, 42, 0.28) !important;
+    box-shadow: 0 0 0 1px rgba(255, 107, 129, 0.35), 0 0 0 4px rgba(255, 107, 129, 0.08);
+    color: #fff;
+}
 .pdf-field.mag   { width: 160px; }
 .pdf-field.year  { width: 46px; }
-.pdf-field.issue { width: 36px; }
+.pdf-field.issue { width: 64px; }
 .pdf-status {
     font-size: 11px; font-weight: bold; flex-shrink: 0; width: 54px; text-align: right;
 }
@@ -527,16 +537,21 @@ body.log-expanded {
 
 /* Toast */
 #toast {
-    position: fixed; top: 70px; right: 20px;
+    position: fixed; top: 88px; left: 50%;
+    transform: translateX(-50%);
     background: rgba(22, 33, 62, 0.92); border: 1px solid var(--line);
-    color: #fff; border-radius: 14px; padding: 12px 16px;
-    font-size: 13px; z-index: 200; display: none; max-width: 300px;
+    color: #fff; border-radius: 18px; padding: 18px 24px;
+    font-size: 18px; font-weight: 700; line-height: 1.25;
+    text-align: center; z-index: 200; display: none;
+    width: min(760px, calc(100vw - 48px));
+    max-width: none;
     box-shadow: var(--shadow);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
 }
 #toast.ok    { border-color: var(--ok); color: var(--ok); }
 #toast.error { border-color: var(--error); color: var(--error); }
+#toast.warn  { border-color: var(--warn); color: #ffd076; }
 
 #loading { color: var(--muted); font-size: 14px; padding: 20px 0; }
 </style>
@@ -546,6 +561,7 @@ body.log-expanded {
 <div id="topBar">
     <span class="title">ADMIN</span>
     <span class="subtitle">Magazine Archive</span>
+    <button onclick="goToSite()">← Back to site</button>
     <button onclick="triggerPatchImport()">Patch OCR data</button>
     <button onclick="loadMagazines()">↺ Refresh</button>
 </div>
@@ -646,7 +662,7 @@ body.log-expanded {
                 </div>
                 <div class="form-group">
                     <label>Issue</label>
-                    <input type="text" id="scan-issue" placeholder="10" maxlength="4">
+                    <input type="text" id="scan-issue" placeholder="10 or 05-06" maxlength="9">
                 </div>
             </div>
             <div class="form-group">
@@ -665,9 +681,13 @@ body.log-expanded {
                 <div class="crop-option-label">Connect to Ollama</div>
                 <div class="crop-option-hint">Use a remote Ollama host for GLM-OCR and optional Mistral cleanup during import.</div>
             </div>
-            <div class="form-group" style="margin-bottom:0; min-width:220px;">
+            <div class="form-group" style="margin-bottom:0; min-width:180px;">
                 <label>Host</label>
-                <input type="text" id="ollama-host" placeholder="192.168.1.111:11434">
+                <input type="text" id="ollama-host" placeholder="192.168.1.111">
+            </div>
+            <div class="form-group" style="margin-bottom:0; min-width:96px;">
+                <label>Port</label>
+                <input type="text" id="ollama-port" value="11434" placeholder="11434">
             </div>
             <div class="form-group" style="margin-bottom:0; min-width:180px;">
                 <label>OCR model</label>
@@ -814,7 +834,12 @@ function toast(msg, type = 'ok') {
     el.className = type;
     el.style.display = 'block';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, type === 'error' ? 5200 : 3200);
+}
+
+function setInvalidState(input, invalid) {
+    if (!input) return;
+    input.classList.toggle('invalid', !!invalid);
 }
 
 function triggerPatchImport() {
@@ -856,7 +881,7 @@ document.getElementById('ocr-patch-file')?.addEventListener('change', function (
 async function loadOllamaSettings() {
     try {
         const settings = await fetchJson(apiUrl('/ollama-settings'));
-        document.getElementById('ollama-host').value = settings.ollama_host || '';
+        applyOllamaHost(settings.ollama_host || '');
         document.getElementById('ollama-use-ocr').checked = settings.use_ocr === true;
         document.getElementById('ollama-ocr-model').value = settings.ocr_model || 'glm-ocr:latest';
         document.getElementById('ollama-cleanup-model').value = settings.cleanup_model || 'mistral-small:24b';
@@ -869,9 +894,39 @@ async function loadOllamaSettings() {
     }
 }
 
+function buildOllamaHost() {
+    const host = document.getElementById('ollama-host').value.trim();
+    const port = document.getElementById('ollama-port').value.trim() || '11434';
+    if (!host) return '';
+    if (/^https?:\/\//i.test(host)) {
+        return host;
+    }
+    return `${host}:${port}`;
+}
+
+function applyOllamaHost(value) {
+    const raw = String(value || '').trim();
+    const hostInput = document.getElementById('ollama-host');
+    const portInput = document.getElementById('ollama-port');
+    if (!raw) {
+        hostInput.value = '';
+        portInput.value = '11434';
+        return;
+    }
+    try {
+        const url = new URL(/^https?:\/\//i.test(raw) ? raw : `http://${raw}`);
+        hostInput.value = url.hostname || '';
+        portInput.value = url.port || '11434';
+    } catch {
+        const m = raw.match(/^(.*?)(?::(\d+))?$/);
+        hostInput.value = (m && m[1]) ? m[1] : raw;
+        portInput.value = (m && m[2]) ? m[2] : '11434';
+    }
+}
+
 async function saveOllamaSettings() {
     const payload = {
-        ollama_host: document.getElementById('ollama-host').value.trim(),
+        ollama_host: buildOllamaHost(),
         use_ocr: document.getElementById('ollama-use-ocr').checked,
         ocr_model: document.getElementById('ollama-ocr-model').value.trim(),
         cleanup_model: document.getElementById('ollama-cleanup-model').value.trim(),
@@ -895,7 +950,7 @@ async function saveOllamaSettings() {
 
 async function testOllamaSettings() {
     const payload = {
-        ollama_host: document.getElementById('ollama-host').value.trim(),
+        ollama_host: buildOllamaHost(),
         use_ocr: document.getElementById('ollama-use-ocr').checked,
         ocr_model: document.getElementById('ollama-ocr-model').value.trim(),
         cleanup_model: document.getElementById('ollama-cleanup-model').value.trim(),
@@ -917,7 +972,7 @@ async function testOllamaSettings() {
 }
 
 function appendOllamaSettingsToFormData(fd) {
-    fd.append('ollama_host', document.getElementById('ollama-host').value.trim());
+    fd.append('ollama_host', buildOllamaHost());
     fd.append('use_ocr', document.getElementById('ollama-use-ocr').checked ? '1' : '0');
     fd.append('ocr_model', document.getElementById('ollama-ocr-model').value.trim());
     fd.append('cleanup_model', document.getElementById('ollama-cleanup-model').value.trim());
@@ -926,6 +981,16 @@ function appendOllamaSettingsToFormData(fd) {
 
 const EMBEDDED_APP_ADMIN = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
 const API_BASE = EMBEDDED_APP_ADMIN ? '/admin-api' : '/api';
+
+function getSiteUrl() {
+    if (EMBEDDED_APP_ADMIN) return '/';
+    const host = window.location.hostname || '127.0.0.1';
+    return `${window.location.protocol}//${host}:8088/`;
+}
+
+function goToSite() {
+    window.location.assign(getSiteUrl());
+}
 
 function apiUrl(path) {
     return `${API_BASE}${path}`;
@@ -991,7 +1056,7 @@ function openViewer(mag, year, issue, page = 1) {
     const url = new URL(viewerBaseUrl());
     url.searchParams.set('mag', mag);
     url.searchParams.set('year', year);
-    url.searchParams.set('issue', String(issue).padStart(2, '0'));
+    url.searchParams.set('issue', normalizeIssue(issue) || String(issue));
     url.searchParams.set('page', String(page));
     url.searchParams.set('adminApi', EMBEDDED_APP_ADMIN ? `${window.location.origin}/admin-api` : window.location.origin);
     url.searchParams.set('grid', '1');
@@ -1215,34 +1280,42 @@ async function clearIndex(params) {
 // ---------------------------------------------------------------------------
 function normalizeIssue(issue) {
     const clean = String(issue || '').trim();
-    if (!/^\d{1,4}$/.test(clean)) return '';
-    return clean.length === 1 ? `0${clean}` : clean;
+    const m = clean.match(/^(\d{1,4})(?:-(\d{1,4}))?$/);
+    if (!m) return '';
+    const first = m[1].length === 1 ? `0${m[1]}` : m[1];
+    if (!m[2]) return first;
+    const second = m[2].length === 1 ? `0${m[2]}` : m[2];
+    return `${first}-${second}`;
 }
 
 function normalizeMagGuess(raw) {
     const guess = String(raw || '').trim().replace(/[_-]+/g, ' ');
     if (!guess) return '';
-    return '';
+    const normalizedGuess = guess.toLocaleLowerCase().replace(/[\s_-]+/g, '');
+    const match = magazineNames.find(name =>
+        String(name).toLocaleLowerCase().replace(/[\s_-]+/g, '') === normalizedGuess
+    );
+    return match || '';
 }
 
 function parseFilename(name) {
     const base = String(name || '').replace(/\.[^.]+$/, '');
 
     // Scan JPG: Mag_YYYY_MM_NNN.jpg
-    let m = base.match(/^(.+?)_(\d{4})_(\d{1,4})_\d{3}$/i);
+    let m = base.match(/^(.+?)_(\d{4})_(\d{1,4}(?:-\d{1,4})?)_\d{3}$/i);
     if (m) return { mag: normalizeMagGuess(m[1]), year: m[2], issue: normalizeIssue(m[3]) };
 
     // Token-based tolerant parsing for arbitrary names like hm_2016_1_lehtiluukku.pdf
-    const tokens = base.split(/[_\s-]+/).filter(Boolean);
+    const tokens = base.split(/[_\s]+/).filter(Boolean);
     for (let i = 0; i < tokens.length - 1; i++) {
-        if (/^\d{4}$/.test(tokens[i]) && /^\d{1,4}$/.test(tokens[i + 1])) {
+        if (/^\d{4}$/.test(tokens[i]) && /^\d{1,4}(?:-\d{1,4})?$/.test(tokens[i + 1])) {
             return {
                 mag: normalizeMagGuess(tokens.slice(0, i).join(' ')),
                 year: tokens[i],
                 issue: normalizeIssue(tokens[i + 1]),
             };
         }
-        if (/^\d{1,4}$/.test(tokens[i]) && /^\d{4}$/.test(tokens[i + 1])) {
+        if (/^\d{1,4}(?:-\d{1,4})?$/.test(tokens[i]) && /^\d{4}$/.test(tokens[i + 1])) {
             return {
                 mag: normalizeMagGuess(tokens.slice(0, i).join(' ')),
                 year: tokens[i + 1],
@@ -1318,7 +1391,10 @@ function renderPdfQueue() {
         magInput.placeholder = 'Choose or type';
         magInput.value = item.mag || '';
         enhanceMagazineInput(magInput);
-        magInput.onchange = () => { pdfQueue[idx].mag = magInput.value.trim(); };
+        const syncPdfMag = () => { pdfQueue[idx].mag = magInput.value.trim(); };
+        magInput.oninput = syncPdfMag;
+        magInput.onchange = syncPdfMag;
+        magInput.addEventListener('input', () => setInvalidState(magInput, false));
 
         const yearLabel = document.createElement('label');
         yearLabel.textContent = 'Year';
@@ -1326,15 +1402,21 @@ function renderPdfQueue() {
         yearInput.className = 'pdf-field year';
         yearInput.maxLength = 4;
         yearInput.value = item.year || '';
-        yearInput.onchange = () => { pdfQueue[idx].year = yearInput.value.trim(); };
+        const syncPdfYear = () => { pdfQueue[idx].year = yearInput.value.trim(); };
+        yearInput.oninput = syncPdfYear;
+        yearInput.onchange = syncPdfYear;
+        yearInput.addEventListener('input', () => setInvalidState(yearInput, false));
 
         const issueLabel = document.createElement('label');
         issueLabel.textContent = 'Issue';
         const issueInput = document.createElement('input');
         issueInput.className = 'pdf-field issue';
-        issueInput.maxLength = 4;
+        issueInput.maxLength = 9;
         issueInput.value = item.issue || '';
-        issueInput.onchange = () => { pdfQueue[idx].issue = issueInput.value.trim(); };
+        const syncPdfIssue = () => { pdfQueue[idx].issue = issueInput.value.trim(); };
+        issueInput.oninput = syncPdfIssue;
+        issueInput.onchange = syncPdfIssue;
+        issueInput.addEventListener('input', () => setInvalidState(issueInput, false));
 
         fields.appendChild(magLabel);
         fields.appendChild(magInput);
@@ -1440,6 +1522,9 @@ function enhanceMagazineInput(input) {
 }
 
 enhanceMagazineInput(document.getElementById('scan-mag'));
+document.getElementById('scan-mag')?.addEventListener('input', e => setInvalidState(e.target, false));
+document.getElementById('scan-year')?.addEventListener('input', e => setInvalidState(e.target, false));
+document.getElementById('scan-issue')?.addEventListener('input', e => setInvalidState(e.target, false));
 
 function pageNumFromName(name) {
     const m = name.match(/_(\d{3})\.jpe?g$/i);
@@ -1567,7 +1652,21 @@ async function uploadPdfQueue() {
         const item = pdfQueue[i];
         if (item.status !== 'pending') continue;
         if (!item.mag || !item.year || !item.issue) {
-            toast(`Missing magazine/year/issue for ${item.file.name}`, 'error'); return;
+            const row = document.getElementById(`pdf-item-${i}`);
+            if (row) {
+                setInvalidState(row.querySelector('.pdf-field.mag'), !item.mag);
+                setInvalidState(row.querySelector('.pdf-field.year'), !item.year);
+                setInvalidState(row.querySelector('.pdf-field.issue'), !item.issue);
+            }
+            const missing = [
+                !item.mag ? 'Magazine' : '',
+                !item.year ? 'Year' : '',
+                !item.issue ? 'Issue' : '',
+            ].filter(Boolean).join(', ');
+            const message = `Missing ${missing} for ${item.file.name}. Fill in all three fields before uploading.`;
+            logLine(message, 'error');
+            toast(message, 'error');
+            return;
         }
     }
 
@@ -1633,10 +1732,27 @@ async function uploadPdfQueue() {
 // Upload: Scans
 // ---------------------------------------------------------------------------
 async function uploadScans() {
-    const mag   = document.getElementById('scan-mag').value.trim();
-    const year  = document.getElementById('scan-year').value.trim();
-    const issue = document.getElementById('scan-issue').value.trim();
-    if (!scanFiles.length || !mag || !year || !issue) { toast('Fill in all fields and select files.', 'error'); return; }
+    const magInput = document.getElementById('scan-mag');
+    const yearInput = document.getElementById('scan-year');
+    const issueInput = document.getElementById('scan-issue');
+    const mag   = magInput.value.trim();
+    const year  = yearInput.value.trim();
+    const issue = issueInput.value.trim();
+    setInvalidState(magInput, !mag);
+    setInvalidState(yearInput, !year);
+    setInvalidState(issueInput, !issue);
+    if (!scanFiles.length || !mag || !year || !issue) {
+        const message = !scanFiles.length
+            ? 'No JPG files selected. Add page images before importing.'
+            : `Missing ${[
+                !mag ? 'Magazine' : '',
+                !year ? 'Year' : '',
+                !issue ? 'Issue' : '',
+            ].filter(Boolean).join(', ')} for scan import.`;
+        logLine(message, 'error');
+        toast(message, 'error');
+        return;
+    }
 
     logLine(`Uploading ${scanFiles.length} page(s) for ${mag} ${issue}/${year}…`);
     const fd = new FormData();
@@ -1834,6 +1950,7 @@ function closeReview() {
 // Init
 // ---------------------------------------------------------------------------
 loadMagazines();
+loadOllamaSettings();
 </script>
 </body>
 </html>

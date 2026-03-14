@@ -45,7 +45,7 @@ from extract import (
 )
 from archive_paths import SCAN_DIR
 from ollama_ocr import ollama_enabled_from_env, ocr_pages_with_ollama
-from search_store import read_index_json, write_index_json
+from search_store import read_index_json, sync_issue_db, write_index_json
 
 PAGE_RE           = re.compile(r"^.+_(\d{4})_(\d{2,})_(\d{3})\.(jpg|jpeg)$", re.IGNORECASE)
 MIN_TEXT_CHARS    = 50
@@ -218,6 +218,7 @@ def run_text_index(issues: list[tuple], tess_lang: str) -> None:
         done = set(raw.get("done", []))
 
     changed = False
+    changed_issues: set[tuple[str, str, str]] = set()
     for mag, year, issue, scan_dir in issues:
         key = f"{mag}/{year}/{issue}"
 
@@ -248,6 +249,7 @@ def run_text_index(issues: list[tuple], tess_lang: str) -> None:
         if new_entries:
             pages.extend(new_entries)
             done.add(key)
+            changed_issues.add((mag, year, issue))
             print(f"    {len(new_entries)} page(s) indexed")
         else:
             no_text.add(key)
@@ -256,8 +258,10 @@ def run_text_index(issues: list[tuple], tess_lang: str) -> None:
 
     if changed:
         out = {"pages": pages, "no_text": sorted(no_text), "done": sorted(done)}
-        print("    Saving search index and rebuilding search database...")
-        write_index_json(out, index_path=SEARCH_INDEX_FILE)
+        print("    Saving search index and updating search database...")
+        write_index_json(out, index_path=SEARCH_INDEX_FILE, rebuild_db=False)
+        for mag, year, issue in sorted(changed_issues):
+            sync_issue_db(out, mag, year, issue)
         print(f"  {SEARCH_INDEX_FILE}: {len(pages)} page(s) total, "
               f"{len(done)} indexed, {len(no_text)} no-text")
     else:

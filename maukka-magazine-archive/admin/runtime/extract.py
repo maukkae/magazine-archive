@@ -31,7 +31,7 @@ import fitz  # PyMuPDF
 from PIL import Image, ImageFilter
 from archive_paths import HTML_FILES, JPG_DIR, MANIFEST_FILE, PDF_DIR, SEARCH_INDEX_FILE
 from ollama_ocr import ollama_enabled_from_env, ocr_pages_with_ollama
-from search_store import read_index_json, write_index_json
+from search_store import normalize_issue_id, read_index_json, sync_issue_db, write_index_json
 
 # ---------------------------------------------------------------------------
 # Config
@@ -50,7 +50,7 @@ def parse_pdf(pdf_path: Path):
     remainder = pdf_path.stem[len(magazine) + 1:]   # strip 'Magazine_' prefix
     parts     = remainder.split("_")
     year  = parts[0]
-    issue = parts[1].zfill(2) if len(parts) > 1 else "01"
+    issue = normalize_issue_id(parts[1]) if len(parts) > 1 else "01"
     return magazine, year, issue
 
 
@@ -190,7 +190,7 @@ def update_magazines_html(magazines: list[str]) -> None:
 # Manifest update
 # ---------------------------------------------------------------------------
 
-COVER_RE = re.compile(r"^(.+)_(\d{4})_(\d{2})_cover\.jpg$")
+COVER_RE = re.compile(r"^(.+)_(\d{4})_(\d{1,4}(?:-\d{1,4})?)_cover\.jpg$")
 
 
 def update_manifest() -> None:
@@ -487,6 +487,7 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
         done = set(data.get("done", []))
 
     changed = False
+    changed_issues: set[tuple[str, str, str]] = set()
     for pdf_path in pdf_files:
         magazine, year, issue = parse_pdf(pdf_path)
         issue_key = f"{magazine}/{year}/{issue}"
@@ -522,6 +523,7 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
                     pages.extend(new_entries)
                     done.add(issue_key)
                     changed = True
+                    changed_issues.add((magazine, year, issue))
                     print(f"    {len(new_entries)} page(s) indexed via remote Ollama OCR")
                     continue
                 print("    no usable text via remote Ollama OCR")
@@ -545,6 +547,7 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
                         pages.extend(new_entries)
                         done.add(issue_key)
                         changed = True
+                        changed_issues.add((magazine, year, issue))
                         print(f"    {len(new_entries)} page(s) indexed via tesseract")
                         continue
                     else:
@@ -576,12 +579,15 @@ def run_text_index(pdf_files: list[Path], manifest: dict,
         doc.close()
         done.add(issue_key)
         changed = True
+        changed_issues.add((magazine, year, issue))
         print(f"    {new_pages} page(s) indexed")
 
     if changed:
         out = {"pages": pages, "no_text": sorted(no_text), "done": sorted(done)}
-        print("  Saving search index and rebuilding search database...")
-        write_index_json(out, index_path=SEARCH_INDEX_FILE)
+        print("  Saving search index and updating search database...")
+        write_index_json(out, index_path=SEARCH_INDEX_FILE, rebuild_db=False)
+        for mag, year, issue in sorted(changed_issues):
+            sync_issue_db(out, mag, year, issue)
         print(f"  {SEARCH_INDEX_FILE}: {len(pages)} page(s), "
               f"{len(no_text)} scanned, {len(done)} text issue(s)")
     else:

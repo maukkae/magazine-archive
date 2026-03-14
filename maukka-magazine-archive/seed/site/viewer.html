@@ -52,10 +52,36 @@
             justify-content: center;
             gap: 3px;
             cursor: zoom-in;
+            position: relative;
         }
 
         body.scrollable #spread { cursor: grab; }
         body.scrollable.panning #spread { cursor: grabbing; }
+
+        #spread .page-slot,
+        #ghost .page-slot {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2px;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        #spread .page-slot.slot-left,
+        #ghost .page-slot.slot-left {
+            box-shadow:
+                10px 0 18px rgba(0,0,0,0.10),
+                0 14px 46px rgba(0,0,0,0.30);
+        }
+
+        #spread .page-slot.slot-right,
+        #ghost .page-slot.slot-right {
+            box-shadow:
+                -10px 0 18px rgba(0,0,0,0.10),
+                0 14px 46px rgba(0,0,0,0.30);
+        }
 
         #spread img, #ghost img {
             display: block;
@@ -64,7 +90,7 @@
             max-width: calc(49vw - 50px);
             width: auto;
             height: auto;
-            box-shadow: 0 20px 80px rgba(0,0,0,0.9);
+            box-shadow: 0 10px 28px rgba(0,0,0,0.16);
             border-radius: 2px;
             user-select: none;
             -webkit-user-drag: none;
@@ -89,6 +115,37 @@
             max-height: none;
             max-width: none;
             /* height & width set by JS via applyZoomLevel / showGhost */
+        }
+
+        .ad-page-overlay {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-shadow: none;
+            user-select: none;
+            z-index: 3;
+            white-space: nowrap;
+        }
+
+        .ad-page-overlay.on-image {
+            color: rgba(80, 80, 80, 0.12);
+        }
+
+        .ad-page-overlay.on-placeholder {
+            color: #f1f1f1;
+        }
+
+        .hidden-ad-page {
+            visibility: hidden;
+        }
+
+        .hidden-ad-slot {
+            background: #ffffff;
         }
 
         /* Top bar */
@@ -125,6 +182,19 @@
 #backBtn:hover { background: #e94560; border-color: #e94560; }
 #backBtn svg { pointer-events: none; }
 
+.topbar-spacer {
+    flex: 1;
+    min-width: 0;
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    pointer-events: all;
+}
+
 .topbar-link {
     background: rgba(15, 52, 96, 0.8);
     border: 1px solid rgba(233, 69, 96, 0.5);
@@ -143,6 +213,114 @@
     pointer-events: all;
 }
 .topbar-link:hover { background: #e94560; border-color: #e94560; }
+
+.topbar-link.active,
+.lang-toggle.active {
+    background: rgba(233, 69, 96, 0.9);
+    border-color: rgba(233, 69, 96, 1);
+    color: #fff;
+}
+
+.lang-toggle.menu-active {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.28);
+    color: #fff;
+}
+
+#hideAdsBtn,
+#gridHideAdsBtn {
+    position: relative;
+    overflow: hidden;
+}
+
+#hideAdsBtn::after,
+#gridHideAdsBtn::after {
+    content: '';
+    position: absolute;
+    width: 150%;
+    height: 2px;
+    background: currentColor;
+    left: -25%;
+    top: 50%;
+    transform: rotate(-28deg) scaleX(0);
+    transform-origin: center;
+    opacity: 0;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+}
+
+#hideAdsBtn.active::after,
+#gridHideAdsBtn.active::after {
+    opacity: 0.92;
+    transform: rotate(-28deg) scaleX(1);
+}
+
+.toggle-menu-wrap {
+    position: relative;
+}
+
+.toggle-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 220px;
+    background: rgba(17, 24, 39, 0.96);
+    border: 1px solid rgba(233, 69, 96, 0.28);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+    z-index: 260;
+}
+
+.toggle-menu.open {
+    display: block;
+}
+
+.toggle-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 6px;
+    color: #d5def2;
+    font-size: 13px;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.08);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.18s ease;
+}
+
+.toggle-switch.on {
+    background: rgba(233, 69, 96, 0.9);
+    border-color: rgba(233, 69, 96, 1);
+}
+
+.toggle-switch.on::after {
+    transform: translateX(18px);
+}
 
         #issueTitle { font-size: 15px; color: #999; letter-spacing: 0.5px; }
 
@@ -360,6 +538,7 @@
             border: 2px solid transparent;
             background: #111;
             transition: border-color 0.15s, transform 0.15s;
+            position: relative;
         }
         .thumb-item:hover { border-color: #e94560; transform: scale(1.03); }
         .thumb-item.active-spread { border-color: rgba(233, 69, 96, 0.9); }
@@ -369,6 +548,27 @@
             box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
         }
         .thumb-item img { display: block; width: 100%; height: auto; pointer-events: none; }
+        .thumb-ad-overlay {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            font-weight: 800;
+            font-size: clamp(22px, 2.4vw, 42px);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            transform: rotate(-52deg);
+            z-index: 1;
+            text-shadow: none;
+            overflow: visible;
+            transform: translateY(-3%) rotate(-52deg);
+            white-space: nowrap;
+        }
+
+        .thumb-ad-overlay.on-placeholder {
+            color: #f1f1f1;
+        }
         .thumb-num {
             text-align: center;
             font-size: 13px;
@@ -382,6 +582,8 @@
             flex-wrap: wrap;
             justify-content: center;
             padding: 0 6px 8px;
+            position: relative;
+            z-index: 2;
         }
         .thumb-tag {
             background: rgba(233, 69, 96, 0.92);
@@ -562,17 +764,21 @@
         <span id="backBtnLabel"></span>
     </a>
     <span id="issueTitle"></span>
-    <a href="/admin/" id="adminLink" class="topbar-link" title="Admin" aria-label="Admin" onclick="event.preventDefault();window.location.assign(getAdminUrl())">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"></path>
-            <path d="M14 2v4h4"></path>
-            <path d="M9 9h6"></path>
-            <path d="M9 13h3"></path>
-            <path d="M18.4 14.5a1 1 0 0 0-1.8 0l-.17.37a1 1 0 0 1-1.2.53l-.39-.13a1 1 0 0 0-1.13 1.45l.22.35a1 1 0 0 1-.2 1.29l-.3.28a1 1 0 0 0 .48 1.7l.42.07a1 1 0 0 1 .8 1.03l-.02.41a1 1 0 0 0 1.57.92l.33-.23a1 1 0 0 1 1.3.1l.3.28a1 1 0 0 0 1.67-.57l.07-.41a1 1 0 0 1 .95-.84l.42-.02a1 1 0 0 0 .83-1.62l-.25-.33a1 1 0 0 1 .04-1.31l.28-.3a1 1 0 0 0-.58-1.67l-.41-.08a1 1 0 0 1-.83-.95l-.03-.42a1 1 0 0 0-.94-.95z"></path>
-            <circle cx="17.5" cy="18.5" r="1.8"></circle>
-        </svg>
-    </a>
-    <button class="lang-toggle" id="langBtn"></button>
+    <span class="topbar-spacer"></span>
+    <div class="topbar-actions">
+        <a href="/admin/" id="adminLink" class="topbar-link" title="Admin" aria-label="Admin" onclick="event.preventDefault();window.location.assign(getAdminUrl())">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"></path>
+                <path d="M14 2v4h4"></path>
+                <path d="M9 9h6"></path>
+                <path d="M9 13h3"></path>
+                <path d="M18.4 14.5a1 1 0 0 0-1.8 0l-.17.37a1 1 0 0 1-1.2.53l-.39-.13a1 1 0 0 0-1.13 1.45l.22.35a1 1 0 0 1-.2 1.29l-.3.28a1 1 0 0 0 .48 1.7l.42.07a1 1 0 0 1 .8 1.03l-.02.41a1 1 0 0 0 1.57.92l.33-.23a1 1 0 0 1 1.3.1l.3.28a1 1 0 0 0 1.67-.57l.07-.41a1 1 0 0 1 .95-.84l.42-.02a1 1 0 0 0 .83-1.62l-.25-.33a1 1 0 0 1 .04-1.31l.28-.3a1 1 0 0 0-.58-1.67l-.41-.08a1 1 0 0 1-.83-.95l-.03-.42a1 1 0 0 0-.94-.95z"></path>
+                <circle cx="17.5" cy="18.5" r="1.8"></circle>
+            </svg>
+        </a>
+        <button class="lang-toggle" id="hideAdsBtn" type="button"></button>
+        <button class="lang-toggle" id="langBtn"></button>
+    </div>
 </div>
 
 <div id="stage">
@@ -611,6 +817,7 @@
     <div id="gridHeader">
         <span id="gridTitle"></span>
         <div id="gridHeaderRight">
+            <button class="lang-toggle" id="gridHideAdsBtn" type="button"></button>
             <div id="tagBar">
                 <select id="tagSelect" class="tag-control">
                     <option value="ad_fullpage">ad_fullpage</option>
@@ -631,7 +838,19 @@
     const params  = new URLSearchParams(location.search);
     const mag     = params.get('mag')   || 'Magazine Archive';
     const year    = params.get('year')  || '1992';
-    const issue   = (params.get('issue') || '01').padStart(2, '0');
+    const issue   = params.get('issue') || '01';
+    const issueLabel = issue;
+    const issueNumber = parseInt(issue.split('-')[0], 10);
+    function issueText(key, total = null) {
+        if (issue.includes('-')) {
+            if (key === 'grid') return `${magName} ${year} / ${issueLabel} · ${total} pages`;
+            if (key === 'loading') return `Loading ${magName} ${year} / ${issueLabel}...`;
+            return `${magName} ${year} / ${issueLabel}`;
+        }
+        if (key === 'grid') return t('grid_title', {mag: magName, year, n: issueNumber, total});
+        if (key === 'loading') return t('loading_issue', {mag: magName, year, n: issueNumber});
+        return t('issue_title_desktop', {mag: magName, year, n: issueNumber});
+    }
     const requestedPageNum = parseInt(params.get('page') || '1', 10);
     const refParam = params.get('ref');  // 'search' when opened from search results
     const openGridOnLoad = params.get('grid') === '1';
@@ -640,20 +859,35 @@
     function getAdminUrl() {
         const host = window.location.hostname || '127.0.0.1';
         const port = window.location.port || '';
-        if (port === '8000' || port === '8002') {
+        if (port === '8000' || port === '8002' || port === '8088') {
             return `${window.location.protocol}//${host}:8001/`;
         }
         return '/admin/';
     }
+    function getAdminApiBase() {
+        const explicit = params.get('adminApi');
+        if (explicit) return explicit.replace(/\/$/, '');
+        const port = window.location.port || '';
+        if (port === '8000' || port === '8002' || port === '8088') {
+            const host = window.location.hostname || '127.0.0.1';
+            return `${window.location.protocol}//${host}:8001/api`;
+        }
+        return `${window.location.origin}/admin-api`;
+    }
     const prefix  = `${mag}_${year}_${issue}`;
     const baseDir = `/jpg/${mag}/${year}/${issue}`;
     const magName = mag.replace(/_/g, ' ');
-    const adminApiBase = params.get('adminApi');
-    const canTagPages = Boolean(adminApiBase);
+    const adminApiBase = getAdminApiBase();
+    const hasPageTagApi = Boolean(adminApiBase);
+    const canTagPages = hasPageTagApi && startTaggingOnLoad;
+    let hideAds = localStorage.getItem('viewerHideAds') === '1';
+    const showAdWatermark = true;
 
     document.getElementById('issueTitle').textContent =
-        t('issue_title_desktop', {mag: magName, year, n: parseInt(issue, 10)});
-    document.title = `${magName} ${year} / ${parseInt(issue, 10)}`;
+        issue.includes('-')
+            ? `${magName} ${year} / ${issueLabel}`
+            : t('issue_title_desktop', {mag: magName, year, n: issueNumber});
+    document.title = `${magName} ${year} / ${issueLabel}`;
     // Set initial translatable UI text (before async pages load)
     (function initStaticLang() {
         const backBtnLabel = document.getElementById('backBtnLabel');
@@ -684,6 +918,7 @@
     let touchStartY   = 0;
     let pendingShowToken = 0;
     const pageImageCache = new Map();
+    const whiteAdImageCache = new Map();
 
     const spreadEl      = document.getElementById('spread');
     const stageEl       = document.getElementById('stage');
@@ -713,6 +948,8 @@
     const loadingText   = document.getElementById('loadingText');
     const loadingFill   = document.getElementById('loadingFill');
     const backBtn       = document.getElementById('backBtn');
+    const hideAdsBtn    = document.getElementById('hideAdsBtn');
+    const gridHideAdsBtn = document.getElementById('gridHideAdsBtn');
 
     // --- Page discovery ---
 
@@ -751,11 +988,16 @@
         return record.promise;
     }
 
+    function isAdPage(pageNum) {
+        return (pageTagMap.get(pageNum) || []).includes('ad_fullpage');
+    }
+
     function preloadAhead(spreadIndex, count = 2) {
         for (let i = 1; i <= count; i++) {
             const idx = spreadIndex + i;
             if (idx >= spreads.length) break;
-            spreads[idx].pages.forEach(url => {
+            spreads[idx].entries.forEach(entry => {
+                const url = entry.url;
                 if (preloaded.has(url)) return;
                 preloaded.add(url);
                 warmImage(url);
@@ -773,17 +1015,46 @@
     function buildSpreads(pages) {
         const result = [];
         if (!pages.length) return result;
+        const entries = pages.map((url, idx) => ({
+            url,
+            page: idx + 1,
+            isAd: isAdPage(idx + 1),
+            hiddenAd: false,
+        }));
         if (viewMode === 'single') {
-            for (let i = 0; i < pages.length; i++) {
-                result.push({ pages: [pages[i]], single: true });
+            for (const entry of entries) {
+                if (hideAds && entry.isAd) continue;
+                result.push({
+                    entries: [{ ...entry }],
+                    pages: [entry.url],
+                    single: true,
+                    firstPage: entry.page,
+                });
             }
         } else {
-            result.push({ pages: [pages[0]], single: true });
-            for (let i = 1; i < pages.length; i += 2) {
-                const s = { pages: [pages[i]], single: false };
-                if (i + 1 < pages.length) s.pages.push(pages[i + 1]);
-                else s.single = true;
-                result.push(s);
+            const coverEntry = entries[0];
+            if (!hideAds || !coverEntry.isAd) {
+                result.push({
+                    entries: [{ ...coverEntry }],
+                    pages: [coverEntry.url],
+                    single: true,
+                    firstPage: coverEntry.page,
+                });
+            }
+            for (let i = 1; i < entries.length; i += 2) {
+                const pair = [entries[i], entries[i + 1]].filter(Boolean);
+                if (!pair.length) continue;
+                if (hideAds && pair.every(entry => entry.isAd)) continue;
+                const spreadEntries = pair.map(entry => ({
+                    ...entry,
+                    hiddenAd: hideAds && entry.isAd,
+                }));
+                result.push({
+                    entries: spreadEntries,
+                    pages: spreadEntries.map(entry => entry.url),
+                    single: spreadEntries.length === 1,
+                    firstPage: spreadEntries[0].page,
+                });
             }
         }
         return result;
@@ -792,28 +1063,32 @@
     // --- Display ---
 
     function spreadLabel(index) {
+        const s = spreads[index];
+        if (!s) return '';
         if (viewMode === 'single') {
-            return index === 0
+            const page = s.entries[0]?.page ?? 1;
+            return page === 1
                 ? t('cover_indicator', {total: totalPages})
-                : t('page_indicator', {n: index + 1, total: totalPages});
+                : t('page_indicator', {n: page, total: totalPages});
         }
-        if (index === 0) return t('cover_indicator', {total: totalPages});
-        const first = index * 2;
-        const s     = spreads[index];
+        if ((s.entries[0]?.page ?? 1) === 1) return t('cover_indicator', {total: totalPages});
+        const first = s.entries[0]?.page ?? 1;
+        const second = s.entries[1]?.page;
         return s.single
             ? t('page_indicator', {n: first, total: totalPages})
-            : t('pages_indicator', {n: first, n1: first + 1, total: totalPages});
+            : t('pages_indicator', {n: first, n1: second, total: totalPages});
     }
 
     function spreadToFirstPage(index) {
-        return viewMode === 'single'
-            ? index + 1
-            : (index === 0 ? 1 : index * 2);
+        return spreads[index]?.firstPage ?? 1;
     }
 
     function pageToSpread(page) {
-        if (viewMode === 'single') return page - 1;
-        return page <= 1 ? 0 : Math.floor(page / 2);
+        const exact = spreads.findIndex(spread => spread.entries.some(entry => entry.page === page));
+        if (exact >= 0) return exact;
+        if (!spreads.length) return 0;
+        const fallback = spreads.findIndex(spread => (spread.firstPage || 0) >= page);
+        return fallback >= 0 ? fallback : (spreads.length - 1);
     }
 
     function updateViewModeButton() {
@@ -919,12 +1194,24 @@
         const s = spreads[index];
         spreadEl.innerHTML = '';
         spreadEl.className = s.single ? 'single' : '';
-        s.pages.forEach(url => {
+        s.entries.forEach(entry => {
+            const url = entry.url;
+            const slot = document.createElement('div');
+            slot.className = 'page-slot';
+            if (s.entries.length === 2) {
+                slot.classList.add(entry === s.entries[0] ? 'slot-left' : 'slot-right');
+            }
+            if (entry.hiddenAd) {
+                slot.classList.add('hidden-ad-slot');
+                slot.style.background = '#ffffff';
+            }
             const cached = pageImageCache.get(url);
             const img = cached ? cached.img.cloneNode(false) : document.createElement('img');
             img.src = url;
             img.draggable = false;
-            spreadEl.appendChild(img);
+            if (entry.hiddenAd) img.classList.add('hidden-ad-page');
+            slot.appendChild(img);
+            spreadEl.appendChild(slot);
         });
         prevBtn.disabled = index === 0;
         nextBtn.disabled = index === spreads.length - 1;
@@ -971,9 +1258,15 @@
         if (!imgs.length || !imgs.every(i => i.naturalHeight > 0)) return false;
         const h = calcFitHeight(imgs, isSingle);
         imgs.forEach(i => {
+            const w = Math.round(h * i.naturalWidth / i.naturalHeight);
             i.style.height   = h + 'px';
-            i.style.width    = Math.round(h * i.naturalWidth / i.naturalHeight) + 'px';
+            i.style.width    = w + 'px';
             i.style.maxWidth = 'none';
+            const slot = i.parentElement;
+            if (slot && slot.classList.contains('page-slot')) {
+                slot.style.height = h + 'px';
+                slot.style.width = w + 'px';
+            }
         });
         return true;
     }
@@ -983,12 +1276,13 @@
         const imgs     = Array.from(spreadEl.querySelectorAll('img'));
         const isSingle = spreadEl.classList.contains('single');
         applyFitSizes(imgs, isSingle);
+        updateAdPageOverlays();
     }
 
     async function ensureSpreadReady(index) {
         const s = spreads[index];
         if (!s) return;
-        await Promise.all(s.pages.map(url => warmImage(url)));
+        await Promise.all(s.entries.map(entry => warmImage(entry.url)));
     }
 
     async function showSpread(index) {
@@ -1016,12 +1310,103 @@
     function updateZoomedImageSize() {
         const imgs = spreadEl.querySelectorAll('img');
         if (zoomLevel <= 1) {
-            imgs.forEach(img => { img.style.height = ''; img.style.width = ''; img.style.maxWidth = ''; });
+            imgs.forEach(img => {
+                img.style.height = '';
+                img.style.width = '';
+                img.style.maxWidth = '';
+                const slot = img.parentElement;
+                if (slot && slot.classList.contains('page-slot')) {
+                    slot.style.height = '';
+                    slot.style.width = '';
+                }
+            });
             fitSpread();
         } else {
             const h = Math.round(fitHeight * zoomLevel);
-            imgs.forEach(img => { img.style.height = h + 'px'; img.style.width = 'auto'; });
+            imgs.forEach(img => {
+                const w = Math.round(h * img.naturalWidth / img.naturalHeight);
+                img.style.height = h + 'px';
+                img.style.width = 'auto';
+                const slot = img.parentElement;
+                if (slot && slot.classList.contains('page-slot')) {
+                    slot.style.height = h + 'px';
+                    slot.style.width = w + 'px';
+                }
+            });
+            updateAdPageOverlays();
         }
+    }
+
+    function visibleSpreadPageNumbers() {
+        return (spreads[currentSpread]?.entries || []).map(entry => entry.page);
+    }
+
+    function isWhiteLikeAdImage(img, cacheKey) {
+        if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) return false;
+        const key = cacheKey || img.currentSrc || img.src;
+        if (key && whiteAdImageCache.has(key)) return whiteAdImageCache.get(key);
+        let result = false;
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const w = 24;
+            const h = Math.max(24, Math.round((img.naturalHeight / img.naturalWidth) * w));
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
+            const { data } = ctx.getImageData(0, 0, w, h);
+            let total = 0;
+            let count = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                total += (data[i] + data[i + 1] + data[i + 2]) / 3;
+                count += 1;
+            }
+            const mean = total / Math.max(1, count);
+            let variance = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                const lum = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                variance += (lum - mean) * (lum - mean);
+            }
+            const stddev = Math.sqrt(variance / Math.max(1, count));
+            result = mean >= 242 && stddev <= 18;
+        } catch (_) {
+            result = false;
+        }
+        if (key) whiteAdImageCache.set(key, result);
+        return result;
+    }
+
+    function renderAdPageOverlays(containerEl, spreadIndex) {
+        containerEl.querySelectorAll('.ad-page-overlay').forEach(el => el.remove());
+        if (!showAdWatermark) return;
+        const slots = Array.from(containerEl.querySelectorAll('.page-slot'));
+        const entries = spreads[spreadIndex]?.entries || [];
+        const pageNumbers = entries.map(entry => entry.page);
+        slots.forEach((slot, idx) => {
+            const pageNum = pageNumbers[idx];
+            const tags = pageTagMap.get(pageNum) || [];
+            if (!tags.includes('ad_fullpage')) return;
+            const img = slot.querySelector('img');
+            const isPlaceholder = Boolean(entries[idx]?.hiddenAd);
+            const isWhiteAd = !isPlaceholder && isWhiteLikeAdImage(img, entries[idx]?.url);
+            if (!isPlaceholder && !isWhiteAd) return;
+            const overlay = document.createElement('div');
+            overlay.className = 'ad-page-overlay';
+            overlay.classList.add((isPlaceholder || isWhiteAd) ? 'on-placeholder' : 'on-image');
+            overlay.textContent = t('ad_overlay');
+            const fontSize = Math.max(36, Math.min(slot.clientWidth, slot.clientHeight) * 0.22);
+            overlay.style.fontSize = `${fontSize}px`;
+            overlay.style.width = `${slot.clientWidth}px`;
+            overlay.style.height = `${slot.clientHeight}px`;
+            overlay.style.left = `${slot.offsetLeft}px`;
+            overlay.style.top = `${slot.offsetTop}px`;
+            overlay.style.transform = 'translateY(-30px) rotate(-52deg)';
+            containerEl.appendChild(overlay);
+        });
+    }
+
+    function updateAdPageOverlays() {
+        renderAdPageOverlays(spreadEl, currentSpread);
     }
 
     function applyZoomLevel(level, clickEvent) {
@@ -1178,15 +1563,31 @@
         const isSingle = s.single;
         ghostEl.innerHTML = '';
         ghostEl.className = (isSingle ? 'single ' : '') + 'active';
-        s.pages.forEach(url => {
+        s.entries.forEach(entry => {
+            const url = entry.url;
+            const slot = document.createElement('div');
+            slot.className = 'page-slot';
+            if (s.entries.length === 2) {
+                slot.classList.add(entry === s.entries[0] ? 'slot-left' : 'slot-right');
+            }
+            if (entry.hiddenAd) {
+                slot.classList.add('hidden-ad-slot');
+                slot.style.background = '#ffffff';
+            }
             const img = document.createElement('img');
             img.src = url;
             img.draggable = false;
+            if (entry.hiddenAd) img.classList.add('hidden-ad-page');
             if (isZoomed && fitHeight) {
-                img.style.height = Math.round(fitHeight * zoomLevel) + 'px';
+                const h = Math.round(fitHeight * zoomLevel);
+                const w = Math.round(h * img.naturalWidth / (img.naturalHeight || 1));
+                img.style.height = h + 'px';
                 img.style.width  = 'auto';
+                slot.style.height = h + 'px';
+                slot.style.width = w + 'px';
             }
-            ghostEl.appendChild(img);
+            slot.appendChild(img);
+            ghostEl.appendChild(slot);
         });
         if (!isZoomed) {
             const ghostImgs = Array.from(ghostEl.querySelectorAll('img'));
@@ -1195,9 +1596,18 @@
                 let remaining = ghostImgs.filter(i => !i.complete || !i.naturalHeight).length;
                 ghostImgs.forEach(img => {
                     if (!img.complete || !img.naturalHeight)
-                        img.addEventListener('load', () => { if (--remaining === 0) trySize(); }, { once: true });
+                        img.addEventListener('load', () => {
+                            if (--remaining === 0) {
+                                trySize();
+                                renderAdPageOverlays(ghostEl, adjacentIndex);
+                            }
+                        }, { once: true });
                 });
+            } else {
+                renderAdPageOverlays(ghostEl, adjacentIndex);
             }
+        } else {
+            renderAdPageOverlays(ghostEl, adjacentIndex);
         }
     }
 
@@ -1356,6 +1766,8 @@
     let taggingMode = false;
     let pageTagMap = new Map();
     let knownTags = ['ad_fullpage'];
+    const pendingTagSaves = new Map();
+    let tagSaveLoopRunning = false;
 
     if (!canTagPages && tagBar) {
         tagBar.style.display = 'none';
@@ -1394,8 +1806,10 @@
     }
 
     async function loadPageTags() {
-        if (!canTagPages) {
+        if (!hasPageTagApi) {
             pageTagMap = new Map();
+            updateAdPageOverlays();
+            if (gridBuilt) refreshVisibleThumbOverlays();
             return;
         }
         try {
@@ -1406,15 +1820,36 @@
             pageTagMap = new Map((data.pages || []).map(p => [Number(p.page), p.page_tags || []]));
             setKnownTags(data.existing_tags || []);
             setTagStatus('Tagging ready');
+            updateAdPageOverlays();
+            if (gridBuilt) refreshVisibleThumbOverlays();
         } catch (err) {
             pageTagMap = new Map();
             setTagStatus('Tag API unavailable', true);
+            updateAdPageOverlays();
+            if (gridBuilt) refreshVisibleThumbOverlays();
         }
     }
 
     function renderThumbTags(item, pageNum) {
+        item.classList.toggle('thumb-ad-fullpage', false);
         item.querySelector('.thumb-tags')?.remove();
+        item.querySelector('.thumb-ad-overlay')?.remove();
         const tags = pageTagMap.get(pageNum) || [];
+        const hasAd = tags.includes('ad_fullpage');
+        const img = item.querySelector('img');
+        if (hasAd && !hideAds && showAdWatermark && img && isWhiteLikeAdImage(img, img.currentSrc || img.src)) {
+            item.classList.add('thumb-ad-fullpage');
+            const overlay = document.createElement('div');
+            overlay.className = 'thumb-ad-overlay on-placeholder';
+            overlay.textContent = t('ad_overlay');
+            const extra = Math.round(Math.max(14, img.clientWidth * 0.12));
+            overlay.style.left = `${img.offsetLeft - extra}px`;
+            overlay.style.top = `${img.offsetTop}px`;
+            overlay.style.width = `${img.clientWidth + extra * 2}px`;
+            overlay.style.height = `${img.clientHeight}px`;
+            item.appendChild(overlay);
+        }
+        if (!canTagPages) return;
         if (!tags.length) return;
         const wrap = document.createElement('div');
         wrap.className = 'thumb-tags';
@@ -1425,6 +1860,18 @@
             wrap.appendChild(el);
         });
         item.appendChild(wrap);
+    }
+
+    function refreshVisibleThumbOverlays() {
+        gridInner.querySelectorAll('.thumb-item').forEach(item => {
+            const pageNum = parseInt(item.dataset.pageNum, 10);
+            if (!Number.isFinite(pageNum)) return;
+            renderThumbTags(item, pageNum);
+        });
+    }
+
+    function findThumbItem(pageNum) {
+        return gridInner.querySelector(`.thumb-item[data-page-num="${pageNum}"]`);
     }
 
     async function savePageTags(pageNum, tags) {
@@ -1444,32 +1891,75 @@
         return resp.json();
     }
 
-    async function togglePageTag(pageNum, item) {
+    function markThumbSaving(pageNum, on) {
+        const item = findThumbItem(pageNum);
+        if (item) setClass(item, 'tag-saving', on);
+    }
+
+    async function processTagSaveQueue() {
+        if (tagSaveLoopRunning) return;
+        tagSaveLoopRunning = true;
+        try {
+            while (pendingTagSaves.size) {
+                const [pageNum, request] = pendingTagSaves.entries().next().value;
+                pendingTagSaves.delete(pageNum);
+                markThumbSaving(pageNum, true);
+                try {
+                    setTagStatus(`Saving p.${pageNum}... (${pendingTagSaves.size} queued)`);
+                    await savePageTags(pageNum, request.nextTags);
+                    setKnownTags([...knownTags, request.tag]);
+                    markThumbSaving(pageNum, pendingTagSaves.has(pageNum));
+                    const stillQueued = pendingTagSaves.has(pageNum);
+                    if (!stillQueued) {
+                        const item = findThumbItem(pageNum);
+                        if (item) renderThumbTags(item, pageNum);
+                    }
+                    if (!pendingTagSaves.size) {
+                        setTagStatus(
+                            request.nextTags.includes(request.tag)
+                                ? `Tagged p.${pageNum} as ${request.tag}`
+                                : `Removed ${request.tag} from p.${pageNum}`
+                        );
+                    }
+                } catch (err) {
+                    if (pendingTagSaves.has(pageNum)) {
+                        continue;
+                    }
+                    pageTagMap.set(pageNum, request.prevTags);
+                    const item = findThumbItem(pageNum);
+                    if (item) {
+                        setClass(item, 'tag-saving', false);
+                        renderThumbTags(item, pageNum);
+                    }
+                    setTagStatus(`Save failed on p.${pageNum}`, true);
+                }
+            }
+        } finally {
+            tagSaveLoopRunning = false;
+            if (pendingTagSaves.size) processTagSaveQueue();
+        }
+    }
+
+    function queuePageTagSave(pageNum, nextTags, prevTags, tag) {
+        pendingTagSaves.set(pageNum, { nextTags, prevTags, tag });
+        markThumbSaving(pageNum, true);
+        processTagSaveQueue();
+    }
+
+    function togglePageTag(pageNum, item) {
         const tag = selectedTag();
         if (!tag) {
             setTagStatus('Select or type a tag', true);
             return;
         }
-        const tags = [...(pageTagMap.get(pageNum) || [])];
-        const nextTags = tags.includes(tag)
-            ? tags.filter(t => t !== tag)
-            : [...tags, tag];
+        const prevTags = [...(pageTagMap.get(pageNum) || [])];
+        const nextTags = prevTags.includes(tag)
+            ? prevTags.filter(t => t !== tag)
+            : [...prevTags, tag];
         pageTagMap.set(pageNum, nextTags);
         renderThumbTags(item, pageNum);
-        setClass(item, 'tag-saving', true);
-        try {
-            setTagStatus(`Saving p.${pageNum}...`);
-            await savePageTags(pageNum, nextTags);
-            setKnownTags([...knownTags, tag]);
-            setClass(item, 'tag-saving', false);
-            renderThumbTags(item, pageNum);
-            setTagStatus(nextTags.includes(tag) ? `Tagged p.${pageNum} as ${tag}` : `Removed ${tag} from p.${pageNum}`);
-        } catch (err) {
-            pageTagMap.set(pageNum, tags);
-            setClass(item, 'tag-saving', false);
-            renderThumbTags(item, pageNum);
-            setTagStatus(`Save failed on p.${pageNum}`, true);
-        }
+        queuePageTagSave(pageNum, nextTags, prevTags, tag);
+        setTagStatus(`Queued p.${pageNum}... (${pendingTagSaves.size} pending)`);
     }
 
     function updateTagModeUi() {
@@ -1484,24 +1974,23 @@
     }
 
     function buildGrid() {
-        document.getElementById('gridTitle').textContent =
-            t('grid_title', {mag: magName, year, n: parseInt(issue, 10), total: totalPages});
+        document.getElementById('gridTitle').textContent = issueText('grid', totalPages);
         gridInner.innerHTML = '';
-        let pageNum = 0;
         spreads.forEach((spread, spreadIdx) => {
-            spread.pages.forEach(url => {
-                pageNum++;
-                const thumbPageNum = pageNum;
+            spread.entries.forEach(entry => {
+                if (hideAds && entry.isAd) return;
+                const thumbPageNum = entry.page;
                 const item = document.createElement('div');
                 item.className = 'thumb-item';
                 item.dataset.spreadIdx = spreadIdx;
                 item.dataset.pageNum = thumbPageNum;
 
                 const img = document.createElement('img');
-                img.src       = thumbUrl(url);
+                img.src       = thumbUrl(entry.url);
                 img.loading   = 'lazy';
                 img.draggable = false;
                 img.alt       = thumbPageNum === 1 ? t('cover_label') : t('page_label', {n: thumbPageNum});
+                img.addEventListener('load', () => renderThumbTags(item, thumbPageNum), { once: true });
 
                 const num = document.createElement('div');
                 num.className   = 'thumb-num';
@@ -1557,6 +2046,25 @@
         tagInput.addEventListener('input', () => { if (taggingMode) updateTagModeUi(); });
     }
 
+    function updateHideAdsButton() {
+        [hideAdsBtn, gridHideAdsBtn].forEach(btn => {
+            if (!btn) return;
+            btn.textContent = t('ads_toggle');
+            btn.title = hideAds ? t('show_ads') : t('hide_ads');
+            setClass(btn, 'active', hideAds);
+        });
+    }
+
+    function refreshForHideAds() {
+        if (!allPages.length) return;
+        const firstPage = spreadToFirstPage(currentSpread);
+        spreads = buildSpreads(allPages);
+        gridBuilt = false;
+        if (!spreads.length) return;
+        showSpread(pageToSpread(firstPage));
+        if (gridOverlay.classList.contains('open')) openGrid();
+    }
+
     // --- Keyboard ---
     document.addEventListener('keydown', e => {
         if (gridOverlay.classList.contains('open')) {
@@ -1588,7 +2096,7 @@
     // --- Init ---
     (async () => {
         await loadPageTags();
-        loadingText.textContent = t('loading_issue', {mag: magName, year, n: parseInt(issue, 10)});
+        loadingText.textContent = issueText('loading');
         allPages = await discoverPages();
         if (!allPages.length) {
             loadingText.textContent = t('no_pages');
@@ -1621,19 +2129,34 @@
         gridBtn.title     = t('page_grid');
         pageIndicator.title = t('click_to_jump');
         updateViewModeButton();
+        updateHideAdsButton();
         // Update issue title
-        document.getElementById('issueTitle').textContent =
-            t('issue_title_desktop', {mag: magName, year, n: parseInt(issue, 10)});
+        document.getElementById('issueTitle').textContent = issueText('title');
         // Re-render page label if spreads are loaded
         if (spreads.length) {
             pageLabel.textContent = spreadLabel(currentSpread);
             if (gridBuilt) buildGrid();
+            updateAdPageOverlays();
         }
     }
 
     document.getElementById('langBtn').addEventListener('click', () => {
         Lang.setLang(Lang.getLang() === 'en' ? 'fi' : 'en');
         applyLang();
+    });
+
+    hideAdsBtn.addEventListener('click', () => {
+        hideAds = !hideAds;
+        localStorage.setItem('viewerHideAds', hideAds ? '1' : '0');
+        updateHideAdsButton();
+        refreshForHideAds();
+    });
+
+    gridHideAdsBtn.addEventListener('click', () => {
+        hideAds = !hideAds;
+        localStorage.setItem('viewerHideAds', hideAds ? '1' : '0');
+        updateHideAdsButton();
+        refreshForHideAds();
     });
 </script>
 </body>
