@@ -4,7 +4,7 @@ name: Magazine Archive
 tagline: Browse and search a self-hosted magazine collection
 icon: https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/icon.png
 category: media
-version: "0.1.10"
+version: "0.1.11"
 port: 8098
 description: >-
   Magazine Archive is a self-hosted viewer for retro and modern magazine
@@ -27,8 +27,8 @@ gallery:
   - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/5.png
   - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/6.png
 releaseNotes: >-
-  Loads the landing-page magazine list dynamically from manifest.json instead
-  of patching HTML during install/update, while keeping the mature
+  Loads the landing-page magazine list dynamically from manifest.json and
+  refreshes the app shell cleanly during updates, while keeping the mature
   viewer/admin/OCR improvements from the manual Umbrel deployment.
 dependencies: []
 path: ""
