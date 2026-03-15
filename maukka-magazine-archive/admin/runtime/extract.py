@@ -45,12 +45,18 @@ DEFAULT_TESS_LANG  = "fin+eng"
 # ---------------------------------------------------------------------------
 
 def parse_pdf(pdf_path: Path):
-    """Return (magazine, year, issue) for a PDF under pdf/<Magazine>/."""
+    """Return (magazine, year, issue) for a PDF under pdf/<Magazine>/.
+
+    Supplement PDFs named ``Magazine_YYYY_MM_liite[_description].pdf``
+    get issue code ``MM-liite`` (e.g. ``03-liite``).
+    """
     magazine  = pdf_path.parent.name
     remainder = pdf_path.stem[len(magazine) + 1:]   # strip 'Magazine_' prefix
     parts     = remainder.split("_")
     year  = parts[0]
     issue = normalize_issue_id(parts[1]) if len(parts) > 1 else "01"
+    if len(parts) > 2 and parts[2].lower() == "liite":
+        issue = f"{issue}-liite"
     return magazine, year, issue
 
 
@@ -94,9 +100,11 @@ def _normalize_print_name(src: Path) -> Path:
 def crop_to_trimbox(src: Path) -> Path | None:
     """Crop a print PDF to its TrimBox and save as a new file.
 
-    All pages are cropped to the same dimensions (minimum TrimBox width × height
-    across the document, centered within each page's TrimBox) so that the
-    resulting JPEGs are pixel-identical in size.
+    Each page is cropped to its own TrimBox.  For uniform PDFs (all pages the
+    same size) every output JPEG ends up identical in pixel dimensions.  For
+    mixed-size PDFs (e.g. a portrait cover followed by landscape spreads) each
+    page group retains its own natural size — this is required so that spread
+    detection and splitting in Stage 2 can work on the correct dimensions.
 
     The original file is never modified.  Returns the output path on success,
     or ``None`` if the PDF has no usable TrimBox margin (TrimBox ≈ MediaBox).
@@ -108,34 +116,33 @@ def crop_to_trimbox(src: Path) -> Path | None:
     # Always re-crop: the _print.pdf is the authoritative original, so the
     # cropped copy can safely be regenerated at any time.
 
+    # Minimum bleed margin to be considered a real print PDF (points).
+    # Typical print bleed is 3–5 mm = 8–14 pt.  Scanner noise is < 2 pt.
+    MIN_BLEED_PT = 5.0
+
     doc = fitz.open(src)
     trimboxes = [page.trimbox for page in doc]
 
     # Check that at least one page has a TrimBox meaningfully inside its MediaBox
-    has_trim = any(
-        page.trimbox != page.mediabox
-        for page in doc
-    )
-    if not has_trim:
-        print(f"  {src.name}: TrimBox == MediaBox on all pages — nothing to crop")
+    # (margin on any side must exceed MIN_BLEED_PT to count as real print bleed)
+    def _has_bleed(page) -> bool:
+        mb, tb = page.mediabox, page.trimbox
+        return (tb.x0 - mb.x0 > MIN_BLEED_PT or mb.x1 - tb.x1 > MIN_BLEED_PT or
+                tb.y0 - mb.y0 > MIN_BLEED_PT or mb.y1 - tb.y1 > MIN_BLEED_PT)
+
+    if not any(_has_bleed(p) for p in doc):
+        print(f"  {src.name}: no significant TrimBox margin — skipping")
         doc.close()
         return None
 
-    # Common crop size: minimum TrimBox width × height across all pages
-    # so every page renders to the same pixel dimensions.
-    min_w = min(tb.width  for tb in trimboxes)
-    min_h = min(tb.height for tb in trimboxes)
-
+    # Summarise unique page sizes for the log line
+    sizes = sorted({f"{tb.width:.1f}x{tb.height:.1f}" for tb in trimboxes})
     print(f"  {src.name}: cropping {len(doc)} pages "
-          f"({min_w:.1f}x{min_h:.1f} pt) -> {out_path.name}")
+          f"({', '.join(sizes)} pt) -> {out_path.name}")
 
     for page, tb in zip(doc, trimboxes):
-        # Center the common rectangle inside this page's TrimBox
-        cx = (tb.x0 + tb.x1) / 2
-        cy = (tb.y0 + tb.y1) / 2
-        crop = fitz.Rect(cx - min_w / 2, cy - min_h / 2,
-                         cx + min_w / 2, cy + min_h / 2)
-        page.set_cropbox(crop)
+        # Apply each page's own TrimBox as its crop box
+        page.set_cropbox(tb)
 
     doc.save(str(out_path))
     doc.close()
@@ -190,7 +197,7 @@ def update_magazines_html(magazines: list[str]) -> None:
 # Manifest update
 # ---------------------------------------------------------------------------
 
-COVER_RE = re.compile(r"^(.+)_(\d{4})_(\d{1,4}(?:-\d{1,4})?)_cover\.jpg$")
+COVER_RE = re.compile(r"^(.+)_(\d{4})_(\d{1,4}(?:-[\w]+)?)_cover\.jpg$")
 
 
 def update_manifest() -> None:
@@ -322,6 +329,44 @@ def _render_page(page, target_height: int,
     return buf.getvalue()
 
 
+def _detect_spread_pdf(doc) -> bool:
+    """Return True if this PDF uses landscape spread pages (two magazine pages side by side).
+
+    Detects by checking whether the second page (first non-cover page) is in
+    landscape orientation: width > height × 1.3.  Typical for supplement PDFs
+    printed as A3 spreads where each PDF page contains two A4 magazine pages.
+    """
+    if len(doc) < 2:
+        return False
+    r = doc[1].rect   # PyMuPDF: cropbox if set, else MediaBox
+    return r.width > r.height * 1.3
+
+
+def _split_spread_jpeg(jpeg_bytes: bytes) -> tuple[bytes, bytes]:
+    """Split a landscape spread JPEG into left and right half-pages.
+
+    Returns (left_jpeg_bytes, right_jpeg_bytes).  The split is at the exact
+    horizontal midpoint; if the spread has a gutter or bleed that lands off-
+    centre the caller should pre-crop the PDF with --crop (TrimBox) first.
+    """
+    img = Image.open(io.BytesIO(jpeg_bytes)).convert("RGB")
+    w, h = img.size
+    mid  = w // 2
+
+    def _to_jpeg(im: Image.Image) -> bytes:
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=92, optimize=True)
+        return buf.getvalue()
+
+    return _to_jpeg(img.crop((0, 0, mid, h))), _to_jpeg(img.crop((mid, 0, w, h)))
+
+
+def _is_spread_page(page) -> bool:
+    """Return True if this individual page is a landscape spread (two pages side by side)."""
+    r = page.rect
+    return r.width > r.height * 1.3
+
+
 def run_content(pdf_files: list[Path], target_height: int,
                 sharpen: tuple | None = None,
                 force: bool = False) -> None:
@@ -332,17 +377,34 @@ def run_content(pdf_files: list[Path], target_height: int,
         out_dir   = JPG_DIR / magazine / year / issue
         doc       = fitz.open(pdf_path)
         n_pages   = len(doc)
-        last_file = out_dir / f"{prefix}_{n_pages:03d}.jpg"
+        # Count output pages per PDF page: spreads (i > 0, landscape) yield 2; others yield 1
+        page_is_spread = [i > 0 and _is_spread_page(p) for i, p in enumerate(doc)]
+        n_output  = sum(2 if s else 1 for s in page_is_spread)
+        last_file = out_dir / f"{prefix}_{n_output:03d}.jpg"
         if last_file.exists() and not force:
-            print(f"  {pdf_path.name}: already extracted ({n_pages} pages), skipping")
+            print(f"  {pdf_path.name}: already extracted ({n_output} pages), skipping")
             doc.close()
             continue
         out_dir.mkdir(parents=True, exist_ok=True)
-        print(f"  {pdf_path.name}: {n_pages} pages -> {out_dir}")
-        for i, page in enumerate(doc):
-            filename = f"{prefix}_{i + 1:03d}.jpg"
-            (out_dir / filename).write_bytes(_render_page(page, target_height, sharpen=sharpen))
-            print(f"    {filename}")
+        n_spreads = sum(page_is_spread)
+        spread_note = f" [spread: {n_spreads} spread page(s) -> {n_output} output pages]" if n_spreads else ""
+        print(f"  {pdf_path.name}: {n_pages} page(s){spread_note} -> {out_dir}")
+        out_num = 1
+        for page, is_spread in zip(doc, page_is_spread):
+            if is_spread:
+                # Render the full spread, then split into left + right portrait pages
+                spread_bytes = _render_page(page, target_height, sharpen=sharpen)
+                left_bytes, right_bytes = _split_spread_jpeg(spread_bytes)
+                for page_bytes in (left_bytes, right_bytes):
+                    filename = f"{prefix}_{out_num:03d}.jpg"
+                    (out_dir / filename).write_bytes(page_bytes)
+                    print(f"    {filename}")
+                    out_num += 1
+            else:
+                filename = f"{prefix}_{out_num:03d}.jpg"
+                (out_dir / filename).write_bytes(_render_page(page, target_height, sharpen=sharpen))
+                print(f"    {filename}")
+                out_num += 1
         doc.close()
 
 # ---------------------------------------------------------------------------
@@ -612,8 +674,7 @@ def main() -> None:
     parser.add_argument("--thumb-height", type=int, default=300,
                         help="Thumbnail height in pixels (default: 300)")
     parser.add_argument("--crop", action="store_true",
-                        help="Crop PDF(s) to TrimBox before extraction "
-                             "(saves cropped copy, original kept intact)")
+                        help="(no-op, kept for back-compat) TrimBox cropping is now automatic")
     parser.add_argument("--force", action="store_true",
                         help="Re-extract even if output JPEGs already exist "
                              "(use when re-processing with --crop or --sharpen)")
@@ -671,14 +732,13 @@ def main() -> None:
 
     print(f"Found {len(pdf_files)} PDF(s)")
 
-    # Pre-stage — crop print PDFs to TrimBox
-    if args.crop:
-        print("\n[Pre-stage] Cropping PDF(s) to TrimBox...")
-        cropped = []
-        for p in pdf_files:
-            result = crop_to_trimbox(p)
-            cropped.append(result if result is not None else p)
-        pdf_files = cropped
+    # Pre-stage — crop print PDFs to TrimBox (auto-detected; --crop is now a no-op kept for back-compat)
+    print("\n[Pre-stage] Checking PDF(s) for TrimBox margins...")
+    cropped = []
+    for p in pdf_files:
+        result = crop_to_trimbox(p)
+        cropped.append(result if result is not None else p)
+    pdf_files = cropped
 
     # Stage 0 — HTML sync + manifest
     if not args.no_html_update:

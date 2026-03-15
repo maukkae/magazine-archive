@@ -597,15 +597,6 @@ body.log-expanded {
             </div>
             <datalist id="magazine-options"></datalist>
             <div id="pdf-queue"></div>
-            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
-                <label class="crop-option" style="margin-bottom:0; align-self:flex-end;">
-                    <input type="checkbox" id="pdf-crop">
-                    <div>
-                        <div class="crop-option-label">Crop print margins (TrimBox)</div>
-                        <div class="crop-option-hint">For press-ready PDFs with bleed margins. Original kept as _print.pdf.</div>
-                    </div>
-                </label>
-            </div>
             <label class="crop-option" style="margin-top:10px;">
                 <input type="checkbox" id="pdf-sharpen" onchange="toggleSharpenOptions()">
                 <div>
@@ -1310,17 +1301,21 @@ function parseFilename(name) {
     const tokens = base.split(/[_\s]+/).filter(Boolean);
     for (let i = 0; i < tokens.length - 1; i++) {
         if (/^\d{4}$/.test(tokens[i]) && /^\d{1,4}(?:-\d{1,4})?$/.test(tokens[i + 1])) {
+            const rawIssue = normalizeIssue(tokens[i + 1]);
+            const liite = tokens[i + 2] && tokens[i + 2].toLowerCase() === 'liite';
             return {
                 mag: normalizeMagGuess(tokens.slice(0, i).join(' ')),
                 year: tokens[i],
-                issue: normalizeIssue(tokens[i + 1]),
+                issue: liite ? `${rawIssue}-liite` : rawIssue,
             };
         }
         if (/^\d{1,4}(?:-\d{1,4})?$/.test(tokens[i]) && /^\d{4}$/.test(tokens[i + 1])) {
+            const rawIssue = normalizeIssue(tokens[i]);
+            const liite = tokens[i + 2] && tokens[i + 2].toLowerCase() === 'liite';
             return {
                 mag: normalizeMagGuess(tokens.slice(0, i).join(' ')),
                 year: tokens[i + 1],
-                issue: normalizeIssue(tokens[i]),
+                issue: liite ? `${rawIssue}-liite` : rawIssue,
             };
         }
     }
@@ -1639,7 +1634,6 @@ function toggleSharpenOptions() {
 }
 
 async function uploadPdfQueue() {
-    const crop             = document.getElementById('pdf-crop').checked;
     const sharpen          = document.getElementById('pdf-sharpen').checked;
     const sharpen_radius   = document.getElementById('sharpen-radius').value.trim();
     const sharpen_percent  = document.getElementById('sharpen-percent').value.trim();
@@ -1679,8 +1673,8 @@ async function uploadPdfQueue() {
         if (item.status !== 'pending') continue;
 
         setPdfItemStatus(i, 'running');
-        const flags = [crop ? 'crop' : '', sharpen ? 'sharpen' : ''].filter(Boolean).join(', ');
-        logLine(`Uploading ${item.file.name}${flags ? ' (' + flags + ')' : ''}...`);
+        const flags = sharpen ? ' (sharpen)' : '';
+        logLine(`Uploading ${item.file.name}${flags}...`);
 
         const fd = new FormData();
         fd.append('file', item.file);
@@ -1688,7 +1682,6 @@ async function uploadPdfQueue() {
         fd.append('year', item.year);
         fd.append('issue', item.issue);
         appendOllamaSettingsToFormData(fd);
-        if (crop) fd.append('crop', '1');
         if (sharpen) {
             fd.append('sharpen', '1');
             fd.append('sharpen_radius',    sharpen_radius);

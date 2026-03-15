@@ -839,7 +839,7 @@
     const mag     = params.get('mag')   || 'Magazine Archive';
     const year    = params.get('year')  || '1992';
     const issue   = params.get('issue') || '01';
-    const issueLabel = issue;
+    const issueLabel  = issue.endsWith('-liite') ? `${parseInt(issue, 10)} liite` : issue;
     const issueNumber = parseInt(issue.split('-')[0], 10);
     function issueText(key, total = null) {
         if (issue.includes('-')) {
@@ -1823,6 +1823,18 @@
             updateAdPageOverlays();
             if (gridBuilt) refreshVisibleThumbOverlays();
         } catch (err) {
+            // Fallback: read-only /api/page-tags on the search server (VPS / no admin API)
+            try {
+                const fbUrl = `/api/page-tags?mag=${encodeURIComponent(mag)}&year=${encodeURIComponent(year)}&issue=${encodeURIComponent(issue)}`;
+                const fbResp = await fetch(fbUrl);
+                if (fbResp.ok) {
+                    const data = await fbResp.json();
+                    pageTagMap = new Map((data.pages || []).map(p => [Number(p.page), p.page_tags || []]));
+                    updateAdPageOverlays();
+                    if (gridBuilt) refreshVisibleThumbOverlays();
+                    return;
+                }
+            } catch (_) {}
             pageTagMap = new Map();
             setTagStatus('Tag API unavailable', true);
             updateAdPageOverlays();
@@ -2159,5 +2171,7 @@
         refreshForHideAds();
     });
 </script>
+<div id="appVer" style="position:fixed;bottom:4px;right:6px;font-size:10px;color:rgba(255,255,255,0.15);font-family:monospace;pointer-events:none;z-index:9999;user-select:none"></div>
+<script>fetch('/version.json').then(r=>r.json()).then(d=>{document.getElementById('appVer').textContent=d.version||'';}).catch(()=>{});</script>
 </body>
 </html>

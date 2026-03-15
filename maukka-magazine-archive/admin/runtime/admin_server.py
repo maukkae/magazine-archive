@@ -76,7 +76,7 @@ def _write_index_magazine(data, mag: str):
 
 def _normalize_issue(issue: str) -> str:
     issue = normalize_issue_id(issue)
-    return issue if re.match(r"^\d{2,4}(?:-\d{2,4})?$", issue) else ""
+    return issue if re.match(r"^\d{2,4}(?:-(?:\d{2,4}|liite))?$", issue) else ""
 
 
 def _read_manifest():

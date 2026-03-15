@@ -569,7 +569,9 @@
 
                         const label = document.createElement('div');
                         label.className   = 'cover-grid-label';
-                        label.textContent = `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${yr}`;
+                        label.textContent = iss.endsWith('-liite')
+                                ? `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${yr} liite`
+                                : `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${yr}`;
 
                         a.appendChild(img);
                         a.appendChild(label);
@@ -956,5 +958,7 @@
                         }
                 });
         </script>
+<div id="appVer" style="position:fixed;bottom:4px;right:6px;font-size:10px;color:rgba(255,255,255,0.15);font-family:monospace;pointer-events:none;z-index:9999;user-select:none"></div>
+<script>fetch('/version.json').then(r=>r.json()).then(d=>{document.getElementById('appVer').textContent=d.version||'';}).catch(()=>{});</script>
 </body>
 </html>

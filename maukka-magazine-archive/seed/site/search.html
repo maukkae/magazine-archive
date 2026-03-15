@@ -252,6 +252,13 @@ let indexLoadingPromise = null;
 let searchApiAvailable = null;
 let backendDetectPromise = null;
 
+function setQueryInUrl(raw) {
+  const url = new URL(window.location.href);
+  if (raw) url.searchParams.set('q', raw);
+  else url.searchParams.delete('q');
+  history.replaceState(null, '', url.toString());
+}
+
 function getAdminUrl() {
   const host = window.location.hostname || '127.0.0.1';
   const port = window.location.port || '';
@@ -338,7 +345,7 @@ async function detectSearchBackend() {
   if (backendDetectPromise) return backendDetectPromise;
   backendDetectPromise = (async () => {
     try {
-      const resp = await withTimeout(fetch('/api/health', { cache: 'no-store' }), 1200);
+      const resp = await withTimeout(fetch('/api/health', { cache: 'no-store' }), 2500);
       searchApiAvailable = resp.ok;
     } catch (e) {
       searchApiAvailable = false;
@@ -537,6 +544,7 @@ async function doSearch() {
   if (!raw) return;
 
   lastQuery = raw;
+  setQueryInUrl(raw);
   statusEl.textContent = t('loading_search');
   resultsEl.innerHTML = '';
   if (await detectSearchBackend()) {
@@ -579,17 +587,35 @@ document.getElementById('backLink').addEventListener('click', e => {
   // else: follow the href fallback to carousel.html
 });
 
-// Detect backend in background and only fall back to client-side index if needed.
-detectSearchBackend().then(ok => {
+async function bootSearchPage() {
   const statusEl = document.getElementById('status');
-  if (ok && !lastQuery && !document.getElementById('query').value.trim()) {
-    statusEl.textContent = 'Search ready';
+  const q = new URL(window.location.href).searchParams.get('q')?.trim() || '';
+  if (q) {
+    document.getElementById('query').value = q;
+    lastQuery = q;
+    await doSearch();
     return;
   }
-  loadIndex();
+  const ok = await detectSearchBackend();
+  statusEl.textContent = ok ? 'Search ready' : 'Search ready (local fallback on demand)';
+}
+
+window.addEventListener('pageshow', () => {
+  const q = new URL(window.location.href).searchParams.get('q')?.trim() || '';
+  if (!q) return;
+  const resultsEl = document.getElementById('results');
+  if (!resultsEl.innerHTML.trim()) {
+    document.getElementById('query').value = q;
+    lastQuery = q;
+    doSearch();
+  }
 });
+
 applyLang();
 document.getElementById('query').focus();
+bootSearchPage();
 </script>
+<div id="appVer" style="position:fixed;bottom:4px;right:6px;font-size:10px;color:rgba(255,255,255,0.15);font-family:monospace;pointer-events:none;z-index:9999;user-select:none"></div>
+<script>fetch('/version.json').then(r=>r.json()).then(d=>{document.getElementById('appVer').textContent=d.version||'';}).catch(()=>{});</script>
 </body>
 </html>

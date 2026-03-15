@@ -284,7 +284,9 @@
 
             const label = document.createElement('div');
             label.className   = 'cover-label';
-            label.textContent = `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${year}`;
+            label.textContent = iss.endsWith('-liite')
+                ? `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${year} liite`
+                : `${currentMag.replace(/_/g, ' ')} ${parseInt(iss, 10)}/${year}`;
 
             a.appendChild(img);
             a.appendChild(label);
@@ -472,5 +474,7 @@
             applyLang();
         });
     </script>
+<div id="appVer" style="position:fixed;bottom:4px;right:6px;font-size:10px;color:rgba(255,255,255,0.15);font-family:monospace;pointer-events:none;z-index:9999;user-select:none"></div>
+<script>fetch('/version.json').then(r=>r.json()).then(d=>{document.getElementById('appVer').textContent=d.version||'';}).catch(()=>{});</script>
 </body>
 </html>

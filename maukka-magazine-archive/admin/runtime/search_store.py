@@ -67,8 +67,13 @@ def read_index_json(index_path: Path = SEARCH_INDEX_JSON) -> dict:
     return {"pages": [], "reviews": [], "done": [], "no_text": []}
 
 
-def connect_search_db(db_path: Path = SEARCH_DB_FILE) -> sqlite3.Connection:
+def connect_search_db(db_path: Path = SEARCH_DB_FILE, read_only: bool = False) -> sqlite3.Connection:
     db_path = Path(db_path)
+    if read_only:
+        # Open immutable read-only — safe on :ro Docker mounts (no WAL/SHM files needed)
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True)
+        conn.row_factory = sqlite3.Row
+        return conn
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -297,8 +302,18 @@ def sync_issue_db(index_data: dict, mag: str, year: str, issue: str, db_path: Pa
             "DELETE FROM pages WHERE mag = ? AND year = ? AND issue = ?",
             (mag, year, issue),
         )
+        conn.execute(
+            "DELETE FROM reviews WHERE mag = ? AND year = ? AND issue = ?",
+            (mag, year, issue),
+        )
         issue_pages = [
             entry for entry in payload.get("pages", [])
+            if entry["mag"] == mag
+            and str(entry["year"]) == year
+            and normalize_issue_id(entry["issue"]) == issue
+        ]
+        issue_reviews = [
+            entry for entry in payload.get("reviews", [])
             if entry["mag"] == mag
             and str(entry["year"]) == year
             and normalize_issue_id(entry["issue"]) == issue
@@ -312,6 +327,17 @@ def sync_issue_db(index_data: dict, mag: str, year: str, issue: str, db_path: Pa
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [_page_row(entry) for entry in issue_pages],
+            )
+        if issue_reviews:
+            conn.executemany(
+                """
+                INSERT INTO reviews (
+                    game, mag, year, issue, page, type, score, score_scale,
+                    reviewers_json, notes, toteutus, pelattavuus, kiinnostavuus, keskiarvo,
+                    search_direct, search_normalized, search_compact, reviewers_text
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [_review_row(entry) for entry in issue_reviews],
             )
         conn.executemany(
             "INSERT OR REPLACE INTO meta (key, value_json) VALUES (?, ?)",
@@ -331,8 +357,13 @@ def sync_magazine_db(index_data: dict, mag: str, db_path: Path = SEARCH_DB_FILE)
     payload = _normalized_payload(index_data)
     try:
         conn.execute("DELETE FROM pages WHERE mag = ?", (mag,))
+        conn.execute("DELETE FROM reviews WHERE mag = ?", (mag,))
         magazine_pages = [
             entry for entry in payload.get("pages", [])
+            if entry["mag"] == mag
+        ]
+        magazine_reviews = [
+            entry for entry in payload.get("reviews", [])
             if entry["mag"] == mag
         ]
         if magazine_pages:
@@ -344,6 +375,17 @@ def sync_magazine_db(index_data: dict, mag: str, db_path: Path = SEARCH_DB_FILE)
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [_page_row(entry) for entry in magazine_pages],
+            )
+        if magazine_reviews:
+            conn.executemany(
+                """
+                INSERT INTO reviews (
+                    game, mag, year, issue, page, type, score, score_scale,
+                    reviewers_json, notes, toteutus, pelattavuus, kiinnostavuus, keskiarvo,
+                    search_direct, search_normalized, search_compact, reviewers_text
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [_review_row(entry) for entry in magazine_reviews],
             )
         conn.executemany(
             "INSERT OR REPLACE INTO meta (key, value_json) VALUES (?, ?)",
