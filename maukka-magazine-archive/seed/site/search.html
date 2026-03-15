@@ -142,6 +142,9 @@ header a:hover { color: #ccc; }
   .badge-review   { background: #e9456022; color: #e94560; border: 1px solid #e9456055; }
   .badge-preview  { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b55; }
   .badge-walkthrough { background: #10b98122; color: #10b981; border: 1px solid #10b98155; }
+  .badge-hifi-testi { background: #6366f122; color: #6366f1; border: 1px solid #6366f155; }
+  .badge-hifi-kokeilu { background: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b55; }
+  .badge-hifi-vertailu { background: #10b98122; color: #10b981; border: 1px solid #10b98155; }
 
   .result-score {
     font-size: 13px;
@@ -153,6 +156,13 @@ header a:hover { color: #ccc; }
     font-size: 12px;
     color: #666;
     margin-bottom: 8px;
+  }
+
+  .result-notes {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 4px;
+    font-style: italic;
   }
 
   .result-snippet {
@@ -439,28 +449,42 @@ function deriveScore(entry) {
   return { value, scale: 5 };
 }
 
+function reviewBadge(type) {
+  switch (type) {
+    case 'review':          return { cls: 'badge-review',        label: t('badge_review') };
+    case 'preview':         return { cls: 'badge-preview',       label: t('badge_preview') };
+    case 'TESTI':           return { cls: 'badge-hifi-testi',    label: 'Testi' };
+    case 'HUIPPUKAIUTTIMET':return { cls: 'badge-hifi-testi',    label: 'Huippu' };
+    case 'KOKEILU':         return { cls: 'badge-hifi-kokeilu',  label: 'Kokeilu' };
+    case 'VERTAILUTESTI':   return { cls: 'badge-hifi-vertailu', label: 'Vertailu' };
+    default:                return { cls: 'badge-walkthrough',   label: t('badge_walkthrough') };
+  }
+}
+
 function renderReviewResult(e, mobile) {
   const magDisplay  = e.mag.replace(/_/g, ' ');
-  const issueNum    = parseInt(e.issue, 10);
-  const badgeClass  = e.type === 'review' ? 'badge-review' : e.type === 'preview' ? 'badge-preview' : 'badge-walkthrough';
-  const badgeLabel  = e.type === 'review' ? t('badge_review') : e.type === 'preview' ? t('badge_preview') : t('badge_walkthrough');
+  const issueDisplay = /^\d+-\d+$/.test(e.issue) ? e.issue : String(parseInt(e.issue, 10));
+  const badge       = reviewBadge(e.type);
   const derivedScore = deriveScore(e);
   const scoreHtml   = derivedScore ? `<span class="result-score">${derivedScore.value}/${derivedScore.scale}</span>` : '';
   const reviewersHtml = e.reviewers?.length
     ? `<div class="result-reviewers">${e.reviewers.join(', ')}</div>` : '';
+  const notesHtml   = (e.type === 'VERTAILUTESTI' && e.notes)
+    ? `<div class="result-notes">${escHtml(e.notes)}</div>` : '';
   const pageHtml = e.page ? `<span class="result-page">${t('page_number_prefix')} ${e.page}</span>` : '';
   return `
     <div class="result review-result">
       <div class="result-meta">
         <span class="result-game">${escHtml(e.game)}</span>
-        <span class="badge ${badgeClass}">${badgeLabel}</span>
+        <span class="badge ${badge.cls}">${badge.label}</span>
         ${scoreHtml}
       </div>
       <div class="result-meta">
         <span class="result-mag">${escHtml(magDisplay)}</span>
-        <span class="result-issue">${issueNum}/${e.year}</span>
+        <span class="result-issue">${issueDisplay}/${e.year}</span>
         ${pageHtml}
       </div>
+      ${notesHtml}
       ${reviewersHtml}
       <div class="result-links">
         ${e.page ? `<a href="${viewerUrl(e, mobile)}">${t('open_in_reader')}</a>` : ''}

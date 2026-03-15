@@ -230,9 +230,14 @@ def _review_row(entry: dict) -> tuple:
 def rebuild_search_db(index_data: dict, db_path: Path = SEARCH_DB_FILE) -> None:
     db_path = Path(db_path)
     conn = connect_search_db(db_path)
+    reviews_data = index_data.get("reviews", [])
     try:
         conn.execute("DELETE FROM pages")
-        conn.execute("DELETE FROM reviews")
+        # Only wipe reviews if the JSON actually supplies them — an empty reviews
+        # array means the JSON doesn't own that data (reviews are managed separately)
+        # and we must not destroy them.
+        if reviews_data:
+            conn.execute("DELETE FROM reviews")
         conn.execute("DELETE FROM meta")
         conn.executemany(
             """
@@ -243,16 +248,17 @@ def rebuild_search_db(index_data: dict, db_path: Path = SEARCH_DB_FILE) -> None:
             """,
             [_page_row(entry) for entry in index_data.get("pages", [])],
         )
-        conn.executemany(
-            """
-            INSERT INTO reviews (
-                game, mag, year, issue, page, type, score, score_scale,
-                reviewers_json, notes, toteutus, pelattavuus, kiinnostavuus, keskiarvo,
-                search_direct, search_normalized, search_compact, reviewers_text
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [_review_row(entry) for entry in index_data.get("reviews", [])],
-        )
+        if reviews_data:
+            conn.executemany(
+                """
+                INSERT INTO reviews (
+                    game, mag, year, issue, page, type, score, score_scale,
+                    reviewers_json, notes, toteutus, pelattavuus, kiinnostavuus, keskiarvo,
+                    search_direct, search_normalized, search_compact, reviewers_text
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [_review_row(entry) for entry in reviews_data],
+            )
         conn.executemany(
             "INSERT OR REPLACE INTO meta (key, value_json) VALUES (?, ?)",
             [
