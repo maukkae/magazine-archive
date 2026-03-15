@@ -880,7 +880,7 @@
     const adminApiBase = getAdminApiBase();
     const hasPageTagApi = Boolean(adminApiBase);
     const canTagPages = hasPageTagApi && startTaggingOnLoad;
-    let hideAds = localStorage.getItem('viewerHideAds') === '1';
+    let hideAds = !startTaggingOnLoad && localStorage.getItem('viewerHideAds') === '1';
     const showAdWatermark = true;
 
     document.getElementById('issueTitle').textContent =

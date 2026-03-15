@@ -4,7 +4,7 @@ name: Magazine Archive
 tagline: Browse and search a self-hosted magazine collection
 icon: https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/icon.png
 category: media
-version: "0.1.15"
+version: "0.1.16"
 port: 8098
 description: >-
   Magazine Archive is a self-hosted viewer for retro and modern magazine
@@ -27,10 +27,10 @@ gallery:
   - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/5.png
   - https://raw.githubusercontent.com/maukkae/magazine-archive/main/maukka-magazine-archive/6.png
 releaseNotes: >-
+  Fixes PDF upload writing jpg/manifest/search index to wrong directory.
   Fixes admin server losing page tags (ad overlays, hide-ads) after deploy.
-  Fixes search database rebuild no longer wiping reviews not owned by the
-  page index. Adds review search support for Hifimaailma-style review types
-  (Testi, Kokeilu, Vertailu, Huippu badges).
+  Viewer opened from admin for tagging now always shows ads regardless of
+  hide-ads preference.
 dependencies: []
 path: ""
 defaultUsername: ""

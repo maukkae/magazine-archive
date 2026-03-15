@@ -19,7 +19,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from archive_paths import JPG_DIR, SCAN_DIR, PDF_DIR, SEARCH_INDEX_FILE
+from archive_paths import ARCHIVE_ROOT, JPG_DIR, SCAN_DIR, PDF_DIR, SEARCH_INDEX_FILE
 from extract import update_manifest, update_magazines_html
 
 HOST     = os.environ.get("ADMIN_HOST", "127.0.0.1")
@@ -123,7 +123,7 @@ def _start_job(cmd: list[str]) -> str:
             unbuffered_cmd = [cmd[0], "-u"] + cmd[1:]
             proc = subprocess.Popen(
                 unbuffered_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, cwd=Path(".").resolve(),
+                text=True, bufsize=1, cwd=ARCHIVE_ROOT.resolve(),
             )
             while True:
                 line = proc.stdout.readline()
